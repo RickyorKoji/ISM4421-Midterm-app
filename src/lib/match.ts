@@ -1,5 +1,5 @@
 import { entries } from '../data/entries';
-import type { GuessTerm, MediaEntry } from '../types';
+import type { GuessTerm, GuessTermKind, MediaEntry } from '../types';
 
 export function normalize(value: string): string {
   return value
@@ -30,6 +30,17 @@ function buildGuessIndex(): GuessTerm[] {
   return terms;
 }
 
+/**
+ * Identity key for "this specific guessable thing". All aliases of a title
+ * collapse to the same key (guessing any alias "uses up" that title), but
+ * each character/setting of the same entry gets its own distinct key — so a
+ * franchise can be identified via one guess while a *specific* character or
+ * setting still takes a separate, correct guess.
+ */
+export function makeGuessKey(entryId: string, kind: GuessTermKind, term: string): string {
+  return kind === 'title' ? `title:${entryId}` : `${kind}:${entryId}:${normalize(term)}`;
+}
+
 export function resolveGuess(raw: string): GuessTerm | null {
   const norm = normalize(raw);
   if (!norm) return null;
@@ -47,13 +58,13 @@ export interface Suggestion {
 }
 
 /** Autocomplete suggestions: collapse to one suggestion per unique display term. */
-export function suggest(query: string, limit = 8, excludeEntryIds: Set<string> = new Set()): Suggestion[] {
+export function suggest(query: string, limit = 8, excludeKeys: Set<string> = new Set()): Suggestion[] {
   const norm = normalize(query);
   if (!norm) return [];
   const seen = new Set<string>();
   const results: Suggestion[] = [];
   for (const t of guessIndex) {
-    if (excludeEntryIds.has(t.entryId)) continue;
+    if (excludeKeys.has(makeGuessKey(t.entryId, t.kind, t.term))) continue;
     if (!t.normalized.includes(norm)) continue;
     const entry = entries.find((e) => e.id === t.entryId) as MediaEntry;
     const label = t.kind === 'title' ? entry.name : t.term;

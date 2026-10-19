@@ -22,6 +22,16 @@ export function pickSeededIndex(seedKey: string, length: number): number {
   return Math.floor(rand() * length);
 }
 
+/**
+ * A reproducible generator: the same seed always yields the same sequence
+ * of draws in the same order, so a caller can draw several related values
+ * (e.g. entry, then kind, then item-within-entry) and get an identical
+ * result for everyone on the same seed (e.g. a daily puzzle).
+ */
+export function createSeededRandom(seedKey: string): () => number {
+  return mulberry32(hashString(seedKey));
+}
+
 export function todaySeedKey(): string {
   const now = new Date();
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;

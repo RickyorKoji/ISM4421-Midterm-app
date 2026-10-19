@@ -3,27 +3,56 @@ import { FlashOverlay } from '../components/FlashOverlay';
 import { AutocompleteInput } from '../components/AutocompleteInput';
 import { GuessRow } from '../components/GuessRow';
 import { entries } from '../data/entries';
-import { resolveGuess, suggest } from '../lib/match';
-import { pickRandomIndex, pickSeededIndex, todaySeedKey } from '../lib/random';
+import { makeGuessKey, resolveGuess, suggest } from '../lib/match';
+import { createSeededRandom, pickRandomIndex, todaySeedKey } from '../lib/random';
 import { recordFranchiseResult, getFranchiseStats } from '../lib/storage';
 import { buildGuessResult } from '../lib/similarity';
 import { sfx } from '../lib/sound';
-import type { GuessResult } from '../types';
+import type { GuessResult, GuessTermKind, MediaEntry } from '../types';
 
 const MAX_TRIES = 8;
 
 type GameMode = 'daily' | 'practice';
 type Status = 'playing' | 'won' | 'lost';
 
-function pickSecretIndex(mode: GameMode, currentIndex?: number) {
-  if (mode === 'daily') return pickSeededIndex(todaySeedKey(), entries.length);
-  return pickRandomIndex(entries.length, currentIndex);
+const TARGET_KINDS: GuessTermKind[] = ['title', 'character', 'setting'];
+const KIND_LABEL: Record<GuessTermKind, string> = { title: 'TITLE', character: 'CHARACTER', setting: 'SETTING' };
+const KIND_NOUN: Record<GuessTermKind, string> = { title: 'Title', character: 'Character', setting: 'Setting' };
+
+interface GuessTarget {
+  kind: GuessTermKind;
+  entry: MediaEntry;
+  /** The exact character/setting name, or the entry's title for kind === 'title'. */
+  label: string;
+}
+
+function itemPool(entry: MediaEntry, kind: GuessTermKind): string[] {
+  if (kind === 'title') return [entry.name];
+  return kind === 'character' ? entry.protagonists : entry.settings;
+}
+
+function buildTarget(entry: MediaEntry, kind: GuessTermKind, draw: () => number): GuessTarget {
+  const pool = itemPool(entry, kind);
+  const idx = pool.length > 1 ? Math.floor(draw() * pool.length) : 0;
+  return { kind, entry, label: pool[idx] };
+}
+
+function pickTarget(mode: GameMode, excludeEntryId?: string): GuessTarget {
+  if (mode === 'daily') {
+    const draw = createSeededRandom(todaySeedKey());
+    const entryIndex = Math.floor(draw() * entries.length);
+    const kind = TARGET_KINDS[Math.floor(draw() * TARGET_KINDS.length)];
+    return buildTarget(entries[entryIndex], kind, draw);
+  }
+  const excludeIndex = excludeEntryId ? entries.findIndex((e) => e.id === excludeEntryId) : undefined;
+  const entryIndex = pickRandomIndex(entries.length, excludeIndex);
+  const kind = TARGET_KINDS[Math.floor(Math.random() * TARGET_KINDS.length)];
+  return buildTarget(entries[entryIndex], kind, Math.random);
 }
 
 export function FranchiseMode() {
   const [mode, setMode] = useState<GameMode>('daily');
-  const [secretIndex, setSecretIndex] = useState(() => pickSecretIndex('daily'));
-  const secret = entries[secretIndex];
+  const [target, setTarget] = useState<GuessTarget>(() => pickTarget('daily'));
 
   const [input, setInput] = useState('');
   const [guesses, setGuesses] = useState<GuessResult[]>([]);
@@ -33,7 +62,11 @@ export function FranchiseMode() {
   const [flash, setFlash] = useState<{ id: number; color: string | null }>({ id: 0, color: null });
   const [stats, setStats] = useState(getFranchiseStats());
 
-  const guessedEntryIds = useMemo(() => new Set(guesses.map((g) => g.entry.id)), [guesses]);
+  const targetKey = makeGuessKey(target.entry.id, target.kind, target.label);
+  const guessedKeys = useMemo(
+    () => new Set(guesses.map((g) => makeGuessKey(g.entry.id, g.guessKind, g.guessTerm))),
+    [guesses],
+  );
   const triesLeft = MAX_TRIES - guesses.length;
 
   function triggerFlash(color: string) {
@@ -47,7 +80,7 @@ export function FranchiseMode() {
 
   function startNewGame(nextMode: GameMode) {
     setMode(nextMode);
-    setSecretIndex(pickSecretIndex(nextMode, nextMode === 'practice' ? secretIndex : undefined));
+    setTarget(pickTarget(nextMode, nextMode === 'practice' ? target.entry.id : undefined));
     setGuesses([]);
     setStatus('playing');
     setMessage(null);
@@ -64,20 +97,21 @@ export function FranchiseMode() {
       return;
     }
     const entry = entries.find((e) => e.id === term.entryId)!;
-    if (guessedEntryIds.has(entry.id)) {
+    const guessKey = makeGuessKey(entry.id, term.kind, term.term);
+    if (guessedKeys.has(guessKey)) {
       sfx.invalid();
       triggerShake();
-      setMessage(`You already guessed ${entry.name}. Try something else.`);
+      setMessage(`You already tried that ${term.kind}. Try something else.`);
       return;
     }
 
     setMessage(null);
-    const result = buildGuessResult(term, entry, secret);
+    const result = buildGuessResult(term, entry, target.entry);
     const nextGuesses = [...guesses, result];
     setGuesses(nextGuesses);
     setInput('');
 
-    if (result.isWinningGuess) {
+    if (guessKey === targetKey) {
       sfx.win();
       triggerFlash('#39ff6a');
       setStatus('won');
@@ -131,8 +165,10 @@ export function FranchiseMode() {
 
       <div className="pixel-border flex items-center justify-between bg-[var(--color-surface)] px-4 py-3">
         <p className="text-sm text-[var(--color-muted)]">
-          Guess the <span className="text-[var(--color-text)]">game or cartoon</span> using titles, characters, or
-          settings. Colors show how close each guess is.
+          This round's target is a specific{' '}
+          <span className="font-retro text-[var(--color-brand-2)]">{KIND_LABEL[target.kind]}</span>. Try any title,
+          character, or setting to narrow down the franchise &mdash; colors show how close it is &mdash; but only
+          the exact {target.kind} wins.
         </p>
         <div className="font-retro ml-3 shrink-0 text-lg text-[var(--color-brand)]">
           {triesLeft}<span className="text-xs text-[var(--color-muted)]">/{MAX_TRIES}</span>
@@ -144,7 +180,7 @@ export function FranchiseMode() {
           value={input}
           onChange={setInput}
           onSubmit={handleSubmit}
-          getSuggestions={(q) => suggest(q, 8, guessedEntryIds)}
+          getSuggestions={(q) => suggest(q, 8, guessedKeys)}
           placeholder="Type a title, character, or setting..."
           shake={shake}
         />
@@ -157,9 +193,13 @@ export function FranchiseMode() {
           className={`pixel-border animate-bounce-in flex flex-col items-center gap-2 p-5 text-center ${status === 'won' ? 'bg-[var(--color-exact)]/10' : 'bg-[#ff3b57]/10'}`}
         >
           <p className="font-retro text-xs text-[var(--color-muted)]">{status === 'won' ? 'SOLVED!' : 'OUT OF TRIES'}</p>
-          <p className="text-xl font-bold">{secret.name}</p>
+          <p className="font-retro text-[9px] text-[var(--color-brand-2)]">THE {KIND_LABEL[target.kind]} WAS</p>
+          <p className="text-xl font-bold">{target.label}</p>
+          {target.kind !== 'title' && (
+            <p className="text-sm text-[var(--color-muted)]">{KIND_NOUN[target.kind]} from {target.entry.name}</p>
+          )}
           <p className="text-sm text-[var(--color-muted)]">
-            {secret.franchise} · {secret.genres.join(', ')} · {secret.year}
+            {target.entry.genres.join(', ')} · {target.entry.year}
           </p>
           <button
             type="button"
@@ -172,9 +212,22 @@ export function FranchiseMode() {
       )}
 
       <ul className="flex flex-col gap-2">
-        {[...guesses].reverse().map((g, i) => (
-          <GuessRow key={`${g.entry.id}-${i}`} result={g} index={guesses.length - 1 - i} />
-        ))}
+        {[...guesses].reverse().map((g, i) => {
+          const rowKey = makeGuessKey(g.entry.id, g.guessKind, g.guessTerm);
+          const sameFranchiseNotExact = g.isWinningGuess && rowKey !== targetKey;
+          return (
+            <GuessRow
+              key={`${g.entry.id}-${g.guessKind}-${g.guessTerm}-${i}`}
+              result={g}
+              index={guesses.length - 1 - i}
+              note={
+                sameFranchiseNotExact
+                  ? `Right franchise (${g.entry.name}) — but we need the exact ${target.kind} this round!`
+                  : undefined
+              }
+            />
+          );
+        })}
       </ul>
     </div>
   );

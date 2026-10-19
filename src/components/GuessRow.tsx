@@ -12,9 +12,14 @@ const KIND_LABEL: Record<GuessResult['guessKind'], string> = {
   setting: 'Setting',
 };
 
-export function GuessRow({ result, index }: { result: GuessResult; index: number }) {
+export function GuessRow({ result, index, note }: { result: GuessResult; index: number; note?: string }) {
   return (
     <li className="pixel-border animate-pop bg-[var(--color-surface)] p-3">
+      {note && (
+        <p className="mb-2 rounded-sm border border-[var(--color-partial)] bg-[var(--color-partial)]/10 px-2 py-1 text-xs text-[var(--color-partial)]">
+          {note}
+        </p>
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-retro text-[9px] text-[var(--color-muted)]">#{index + 1}</span>

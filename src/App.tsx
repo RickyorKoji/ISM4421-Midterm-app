@@ -96,12 +96,14 @@ function App() {
                 <>
                   <p className="mb-1 font-semibold text-[var(--color-text)]">Franchise Guess</p>
                   <p>
-                    A secret game or cartoon is chosen. You have 8 guesses. Type any <b>title</b>, <b>character</b>, or{' '}
-                    <b>setting</b> (a stage, map, or location) &mdash; each guess reveals how close that entry's
-                    attributes are to the secret's: <span className="text-[var(--color-exact)]">green</span> = exact
-                    match, <span className="text-[var(--color-partial)]">yellow</span> = related/overlapping (same
-                    genre, nearby era, shared platform), <span className="text-[var(--color-muted)]">gray</span> = no
-                    relation.
+                    Each round picks a specific secret <b>title</b>, <b>character</b>, or <b>setting</b> &mdash; shown
+                    at the top as this round's target kind. You have 8 guesses, and you can type any title, character,
+                    or setting to search: each one reveals how close that entry's attributes are to the secret's
+                    entry (<span className="text-[var(--color-exact)]">green</span> = exact match,{' '}
+                    <span className="text-[var(--color-partial)]">yellow</span> = related/overlapping,{' '}
+                    <span className="text-[var(--color-muted)]">gray</span> = no relation), so you can narrow down the
+                    franchise this way. But identifying the franchise isn't enough to win &mdash; only guessing the
+                    exact character/setting/title asked for does.
                   </p>
                 </>
               ) : (
