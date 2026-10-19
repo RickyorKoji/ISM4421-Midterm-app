@@ -65,7 +65,7 @@ export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[
       weight: 15,
       level: closeness(yearDiff, 2, 8),
       guessValue: String(guess.year),
-      secretValue: yearDiff === 0 ? String(secret.year) : yearDiff > 0 ? 'Later ↑' : 'Earlier ↓',
+      secretValue: yearDiff === 0 ? String(secret.year) : yearDiff > 0 ? 'Newer ↑' : 'Older ↓',
     },
     {
       label: 'Popularity',
