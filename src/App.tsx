@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FranchiseMode } from './modes/FranchiseMode';
 import { RarityMode } from './modes/RarityMode';
+import { SuggestTitleModal } from './components/SuggestTitleModal';
 import { getMuted, setMutedPref } from './lib/storage';
 import { setMuted, sfx } from './lib/sound';
 
@@ -14,6 +15,7 @@ function App() {
     return m;
   });
   const [showHelp, setShowHelp] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
 
   function toggleMute() {
     const next = !muted;
@@ -30,7 +32,14 @@ function App() {
             <h1 className="font-retro flex items-center gap-2 text-xs text-[var(--color-brand)] sm:text-sm">
               <span aria-hidden="true">🕹️</span> PIXEL GUESS
             </h1>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSuggest(true)}
+                className="font-retro rounded-sm border-2 border-[var(--color-border)] px-2 py-1.5 text-[9px] text-[var(--color-muted)]"
+              >
+                + Suggest
+              </button>
               <button
                 type="button"
                 onClick={() => setShowHelp((v) => !v)}
@@ -116,6 +125,8 @@ function App() {
       <footer className="mx-auto max-w-3xl px-4 pb-8 text-center text-[10px] text-[var(--color-muted)]">
         Built for fluid play on iPhone, Mac, and desktop browsers &mdash; add to your home screen for the full arcade feel.
       </footer>
+
+      {showSuggest && <SuggestTitleModal onClose={() => setShowSuggest(false)} />}
     </div>
   );
 }
