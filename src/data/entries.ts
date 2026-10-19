@@ -1,5 +1,15 @@
 import type { MediaEntry } from '../types';
 
+// Data-quality note for future additions: most franchises are stable enough
+// (genre, cast, platforms) that one blended entry fairly represents every
+// game/season in it. A few are not — Grand Theft Auto and Final Fantasy are
+// the clearest cases, where each installment has its own protagonist(s),
+// setting(s), decade, and sometimes genre (Final Fantasy XIV is an MMO, not
+// a single-player JRPG). Blending those into one record would attach the
+// wrong year/setting/genre to a guess like "Cloud Strife" or "Tommy
+// Vercetti". When a franchise swings that hard between entries, split it
+// into one MediaEntry per representative installment (see the `gta-*` and
+// `final-fantasy-*` entries below) instead of averaging it into one.
 export const entries: MediaEntry[] = [
   {
     id: 'devil-may-cry',
@@ -155,19 +165,66 @@ export const entries: MediaEntry[] = [
     aliases: ['zelda', 'botw', 'totk'],
     popularity: 95,
   },
+  // Final Fantasy is split by mainline entry rather than one blended
+  // "Final Fantasy" record: each numbered game has its own cast, world,
+  // era, and sometimes genre (XIV is an MMO, not a single-player JRPG),
+  // so merging them into one entry would give a guess like "Cloud Strife"
+  // a year/setting/genre (e.g. 1987, Insomnia) that isn't actually his.
   {
-    id: 'final-fantasy',
-    name: 'Final Fantasy',
+    id: 'final-fantasy-vii',
+    name: 'Final Fantasy VII',
     type: 'game',
     franchise: 'Final Fantasy',
     publisher: 'Square Enix',
-    genres: ['RPG', 'JRPG'],
+    genres: ['RPG', 'JRPG', 'Sci-Fantasy'],
     platforms: ['PlayStation', 'Xbox', 'Nintendo', 'PC'],
-    year: 1987,
-    protagonists: ['Cloud Strife', 'Lightning', 'Noctis Lucis Caelum'],
-    settings: ['Midgar', 'Gold Saucer', 'Insomnia'],
+    year: 1997,
+    protagonists: ['Cloud Strife', 'Tifa Lockhart', 'Aerith Gainsborough'],
+    settings: ['Midgar', 'Gold Saucer', 'Nibelheim'],
     aliases: ['ff', 'ffvii', 'ff7'],
-    popularity: 84,
+    popularity: 87,
+  },
+  {
+    id: 'final-fantasy-x',
+    name: 'Final Fantasy X',
+    type: 'game',
+    franchise: 'Final Fantasy',
+    publisher: 'Square Enix',
+    genres: ['RPG', 'JRPG', 'Fantasy'],
+    platforms: ['PlayStation', 'Xbox', 'Nintendo', 'PC'],
+    year: 2001,
+    protagonists: ['Tidus', 'Yuna', 'Wakka'],
+    settings: ['Spira', 'Zanarkand', 'Besaid Island'],
+    aliases: ['ffx', 'ff10'],
+    popularity: 76,
+  },
+  {
+    id: 'final-fantasy-xiv',
+    name: 'Final Fantasy XIV',
+    type: 'game',
+    franchise: 'Final Fantasy',
+    publisher: 'Square Enix',
+    genres: ['MMORPG', 'RPG', 'Fantasy'],
+    platforms: ['PC', 'PlayStation', 'Xbox'],
+    year: 2010,
+    protagonists: ['The Warrior of Light', "Y'shtola", 'Thancred'],
+    settings: ['Eorzea', "Ul'dah", 'Limsa Lominsa'],
+    aliases: ['ffxiv', 'ff14'],
+    popularity: 70,
+  },
+  {
+    id: 'final-fantasy-xv',
+    name: 'Final Fantasy XV',
+    type: 'game',
+    franchise: 'Final Fantasy',
+    publisher: 'Square Enix',
+    genres: ['RPG', 'JRPG', 'Open World', 'Action'],
+    platforms: ['PlayStation', 'Xbox', 'PC'],
+    year: 2016,
+    protagonists: ['Noctis Lucis Caelum', 'Gladiolus Amicitia', 'Prompto Argentum'],
+    settings: ['Insomnia', 'Lucis', 'Altissia'],
+    aliases: ['ffxv', 'ff15'],
+    popularity: 72,
   },
   {
     id: 'dragon-quest',
@@ -323,17 +380,63 @@ export const entries: MediaEntry[] = [
     aliases: [],
     popularity: 99,
   },
+  // Grand Theft Auto is split by game rather than blended into one
+  // "Grand Theft Auto" record: Vice City, San Andreas, IV, and V each
+  // have a different protagonist, city, and decade, so a single entry
+  // would misreport the Era/Setting for whichever one you actually guess.
   {
-    id: 'gta',
-    name: 'Grand Theft Auto',
+    id: 'gta-vice-city',
+    name: 'Grand Theft Auto: Vice City',
     type: 'game',
     franchise: 'Grand Theft Auto',
     publisher: 'Rockstar Games',
     genres: ['Open World', 'Action', 'Crime'],
     platforms: ['PlayStation', 'Xbox', 'PC'],
-    year: 1997,
-    protagonists: ['Carl "CJ" Johnson', 'Niko Bellic', 'Michael De Santa'],
-    settings: ['Los Santos', 'Liberty City', 'Vice City'],
+    year: 2002,
+    protagonists: ['Tommy Vercetti', 'Lance Vance', 'Ken Rosenberg'],
+    settings: ['Vice City', 'Ocean Beach', 'Vercetti Estate'],
+    aliases: ['vice city', 'gta vc'],
+    popularity: 83,
+  },
+  {
+    id: 'gta-san-andreas',
+    name: 'Grand Theft Auto: San Andreas',
+    type: 'game',
+    franchise: 'Grand Theft Auto',
+    publisher: 'Rockstar Games',
+    genres: ['Open World', 'Action', 'Crime'],
+    platforms: ['PlayStation', 'Xbox', 'PC'],
+    year: 2004,
+    protagonists: ['Carl "CJ" Johnson', 'Big Smoke', 'Sweet Johnson'],
+    settings: ['Los Santos, San Andreas', 'San Fierro', 'Las Venturas'],
+    aliases: ['san andreas', 'gta sa'],
+    popularity: 88,
+  },
+  {
+    id: 'gta-iv',
+    name: 'Grand Theft Auto IV',
+    type: 'game',
+    franchise: 'Grand Theft Auto',
+    publisher: 'Rockstar Games',
+    genres: ['Open World', 'Action', 'Crime'],
+    platforms: ['PlayStation', 'Xbox', 'PC'],
+    year: 2008,
+    protagonists: ['Niko Bellic', 'Roman Bellic', 'Little Jacob'],
+    settings: ['Liberty City', 'Algonquin', 'Broker'],
+    aliases: ['gta 4'],
+    popularity: 82,
+  },
+  {
+    id: 'gta-v',
+    name: 'Grand Theft Auto V',
+    type: 'game',
+    franchise: 'Grand Theft Auto',
+    publisher: 'Rockstar Games',
+    genres: ['Open World', 'Action', 'Crime'],
+    platforms: ['PlayStation', 'Xbox', 'PC'],
+    year: 2013,
+    protagonists: ['Michael De Santa', 'Franklin Clinton', 'Trevor Philips'],
+    settings: ['Los Santos', 'Blaine County', 'Paleto Bay'],
     aliases: ['gta v', 'gta 5', 'grand theft auto v'],
     popularity: 96,
   },
