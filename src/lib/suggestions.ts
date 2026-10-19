@@ -1,4 +1,4 @@
-export type SuggestionStatus = 'duplicate' | 'verified' | 'unverified' | 'rejected';
+export type SuggestionStatus = 'duplicate' | 'verified' | 'off-topic' | 'unverified' | 'rejected';
 
 export interface SuggestionRecord {
   id: string;
@@ -9,6 +9,7 @@ export interface SuggestionRecord {
   wikiTitle?: string;
   wikiSnippet?: string;
   wikiUrl?: string;
+  wikiCategories?: string[];
   timestamp: number;
 }
 

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { addSuggestionRecord, getSuggestionLog } from '../lib/suggestions';
 import type { SuggestionRecord, SuggestionStatus } from '../lib/suggestions';
-import { checkDuplicate, validateFormat, verifyExists } from '../lib/verify';
+import { checkDuplicate, classifyTitle, validateFormat } from '../lib/verify';
+import type { MediaKind } from '../lib/verify';
 import { sfx } from '../lib/sound';
 
 const COOLDOWN_MS = 4000;
@@ -10,6 +11,7 @@ const LIVE_LOOKUP_DEBOUNCE_MS = 600;
 const STATUS_STYLE: Record<SuggestionStatus, string> = {
   duplicate: 'border-[var(--color-partial)] text-[var(--color-partial)]',
   verified: 'border-[var(--color-exact)] text-[var(--color-exact)]',
+  'off-topic': 'border-[var(--color-none)] text-[var(--color-muted)]',
   unverified: 'border-[var(--color-brand-2)] text-[var(--color-brand-2)]',
   rejected: 'border-[#ff3b57] text-[#ff3b57]',
 };
@@ -17,6 +19,7 @@ const STATUS_STYLE: Record<SuggestionStatus, string> = {
 const STATUS_LABEL: Record<SuggestionStatus, string> = {
   duplicate: 'Already Known',
   verified: 'Verified',
+  'off-topic': 'Not a Game/Show',
   unverified: 'Needs Review',
   rejected: 'Rejected',
 };
@@ -24,19 +27,27 @@ const STATUS_LABEL: Record<SuggestionStatus, string> = {
 const STATUS_TEXT_COLOR: Record<SuggestionStatus, string> = {
   duplicate: 'text-[var(--color-partial)]',
   verified: 'text-[var(--color-exact)]',
+  'off-topic': 'text-[var(--color-muted)]',
   unverified: 'text-[var(--color-brand-2)]',
   rejected: 'text-[#ff3b57]',
 };
 
+const KIND_WORD: Record<MediaKind, string> = {
+  game: 'video game',
+  show: 'animated/TV show',
+  both: 'video game and show',
+  unknown: 'title',
+};
+
 interface LiveCheck {
   kind: SuggestionStatus | 'checking';
-  /** The trimmed input text this check result applies to. */
   forTerm: string;
   note: string;
   matchedEntryName?: string;
   wikiTitle?: string;
   wikiSnippet?: string;
   wikiUrl?: string;
+  wikiCategories?: string[];
 }
 
 function timeAgo(ts: number): string {
@@ -119,13 +130,26 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
     debounceRef.current = window.setTimeout(() => {
       const controller = new AbortController();
       abortRef.current = controller;
-      verifyExists(trimmed, controller.signal).then((wiki) => {
+      classifyTitle(trimmed, controller.signal).then((wiki) => {
         if (myId !== requestIdRef.current) return; // superseded by a newer keystroke
-        if (wiki.found) {
+
+        if (wiki.isGameOrShow) {
+          const kindWord = KIND_WORD[wiki.kind];
+          const categoryHint = wiki.matchedCategories && wiki.matchedCategories.length > 0 ? ` (Wikipedia category: "${wiki.matchedCategories[0]}")` : '';
           setLiveCheck({
             kind: 'verified',
             forTerm: trimmed,
-            note: 'Looks like a real title.',
+            note: `Confirmed as a real ${kindWord} on Wikipedia${categoryHint}.`,
+            wikiTitle: wiki.title,
+            wikiSnippet: wiki.snippet,
+            wikiUrl: wiki.url,
+            wikiCategories: wiki.matchedCategories,
+          });
+        } else if (wiki.found) {
+          setLiveCheck({
+            kind: 'off-topic',
+            forTerm: trimmed,
+            note: `Found "${wiki.title}" on Wikipedia, but it isn't categorized as a video game or animated/TV show.`,
             wikiTitle: wiki.title,
             wikiSnippet: wiki.snippet,
             wikiUrl: wiki.url,
@@ -134,7 +158,7 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
           setLiveCheck({
             kind: 'unverified',
             forTerm: trimmed,
-            note: wiki.error ?? "Couldn't confirm this automatically yet.",
+            note: wiki.error ?? 'No confident match found on Wikipedia — flagged for manual review.',
           });
         }
       });
@@ -154,14 +178,12 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
     const full = addSuggestionRecord({
       term,
       status: liveCheck.kind,
-      note:
-        liveCheck.kind === 'verified'
-          ? 'Confirmed as a real title — queued for review before it can be added to the game.'
-          : liveCheck.note,
+      note: liveCheck.note,
       matchedEntryName: liveCheck.matchedEntryName,
       wikiTitle: liveCheck.wikiTitle,
       wikiSnippet: liveCheck.wikiSnippet,
       wikiUrl: liveCheck.wikiUrl,
+      wikiCategories: liveCheck.wikiCategories,
     });
     setLog((l) => [full, ...l].slice(0, 30));
     setLastResult(full);
@@ -196,8 +218,9 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
 
         <p className="mb-4 text-xs text-[var(--color-muted)]">
           Think we're missing a game or show? Start typing below &mdash; we'll check it against what's already in the
-          game and try to confirm it's a real title (via Wikipedia) as you type. Press CHECK to log the result below,
-          so the list stays made of actual titles, not random text.
+          game, then search Wikipedia and look at that article's own categories to confirm it's actually tagged as a{' '}
+          <b>video game</b> or an <b>animated/TV series</b> (not just that some page with similar words exists).
+          Press CHECK to log the result below.
         </p>
 
         <div className="mb-1 flex gap-2">
