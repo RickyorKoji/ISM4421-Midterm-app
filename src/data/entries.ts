@@ -10,6 +10,39 @@ import type { MediaEntry } from '../types';
 // Vercetti". When a franchise swings that hard between entries, split it
 // into one MediaEntry per representative installment (see the `gta-*` and
 // `final-fantasy-*` entries below) instead of averaging it into one.
+//
+// `popularity` (0-100) methodology: it estimates how broadly a title is
+// recognized by the general public — not how large or devoted its own
+// fanbase is — because that's what Rarity Challenge's tiers are supposed to
+// measure. It deliberately does NOT come from any single platform's rating,
+// review score, or internal "popularity" ranking (not MyAnimeList's
+// popularity rank, not Metacritic critic scores, not Steam/IMDb user
+// ratings): each of those reflects one particular self-selected community,
+// not the public at large, and anchoring to just one would bias the whole
+// scale toward that site's audience — which is exactly the kind of
+// single-source skew this field is meant to avoid. Instead it draws on
+// different public, checkable evidence depending on medium, since sales
+// figures don't exist for things that aren't sold per-unit:
+//   - Games: lifetime unit sales where publicly reported (Wikipedia's
+//     "List of best-selling video games" / "...franchises").
+//   - TV/anime: production longevity (seasons/episodes, years still
+//     running) and breadth of distribution (networks, countries,
+//     syndication/streaming reach).
+//   - Free-to-play/live-service games: concurrent-player scale and
+//     real-world cultural adoption (e.g. dances/memes going mainstream)
+//     as a stand-in for unit sales.
+//   - Cross-medium cultural penetration (does it get referenced outside
+//     its own niche?) as a tiebreaker on top of the above.
+// A franchise split into several installments (see the note above) scores
+// each installment on its OWN fame, not a fraction of the whole franchise's
+// total — Final Fantasy VII being one of the best-selling RPGs ever in its
+// own right is the point, not "divide Final Fantasy's total by four". And
+// where real sources genuinely disagree with each other (this came up for
+// relative anime rankings — manga sales circulation, historical Western TV
+// syndication, and current fan-site activity each rank the same shows
+// differently), the number here is a deliberately conservative blend rather
+// than false precision borrowed from whichever single source was checked
+// last.
 export const entries: MediaEntry[] = [
   {
     id: 'devil-may-cry',
@@ -65,7 +98,7 @@ export const entries: MediaEntry[] = [
     protagonists: ['Ryu', 'Chun-Li', 'Ken Masters', 'Guile', 'M. Bison', 'Akuma'],
     settings: ['Suzaku Castle', "Chun-Li's Market", 'Secret Laboratory', "Guile's Air Force Base", "Bison's Lair"],
     aliases: ['sf', 'street fighter 6', 'sf6'],
-    popularity: 86,
+    popularity: 84,
   },
   {
     id: 'tekken',
@@ -870,7 +903,7 @@ export const entries: MediaEntry[] = [
     protagonists: ['Rick Sanchez', 'Morty Smith', 'Summer Smith', 'Beth Smith', 'Jerry Smith', 'Mr. Poopybutthole'],
     settings: ['Citadel of Ricks', 'Earth (C-137)', 'Gazorpazorp', 'The Smith Garage', 'Interdimensional Cable', 'Blips and Chitz'],
     aliases: [],
-    popularity: 85,
+    popularity: 78,
   },
   {
     id: 'tmnt',
@@ -1922,7 +1955,7 @@ export const entries: MediaEntry[] = [
     protagonists: ['Peter Griffin', 'Stewie Griffin', 'Brian Griffin', 'Lois Griffin', 'Chris Griffin', 'Meg Griffin'],
     settings: ['Quahog', 'The Griffin House', 'The Drunken Clam', 'James Woods High School', 'Quahog Harbor', 'The Pawtucket Patriot Brewery'],
     aliases: [],
-    popularity: 83,
+    popularity: 84,
   },
   {
     id: 'the-simpsons',
@@ -1936,7 +1969,7 @@ export const entries: MediaEntry[] = [
     protagonists: ['Homer Simpson', 'Bart Simpson', 'Marge Simpson', 'Lisa Simpson', 'Ned Flanders', 'Mr. Burns'],
     settings: ['Springfield', 'Springfield Elementary', "Moe's Tavern", 'Springfield Nuclear Power Plant', 'Kwik-E-Mart', 'Krustylu Studios'],
     aliases: [],
-    popularity: 91,
+    popularity: 92,
   },
   {
     id: 'south-park',
@@ -1950,7 +1983,7 @@ export const entries: MediaEntry[] = [
     protagonists: ['Stan Marsh', 'Kyle Broflovski', 'Eric Cartman', 'Kenny McCormick', 'Butters Stotch', 'Randy Marsh'],
     settings: ['South Park', 'South Park Elementary', 'City Wok', "Token's House", 'Casa Bonita', 'South Park Mall'],
     aliases: [],
-    popularity: 82,
+    popularity: 83,
   },
   {
     id: 'bobs-burgers',
@@ -2292,7 +2325,7 @@ export const entries: MediaEntry[] = [
     protagonists: ['Monkey D. Luffy', 'Roronoa Zoro', 'Nami', 'Sanji', 'Nico Robin', 'Portgas D. Ace'],
     settings: ['The Grand Line', 'Water 7', 'Wano Country', 'Enies Lobby', 'Alabasta', 'Marineford'],
     aliases: [],
-    popularity: 86,
+    popularity: 90,
   },
   {
     id: 'attack-on-titan',

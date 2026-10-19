@@ -150,7 +150,7 @@ export function RarityMode() {
                 <p className="text-[var(--color-muted)]">{h.prompt}</p>
                 <p className="font-medium text-[var(--color-text)]">
                   {h.outcome === 'skipped' ? <span className="italic text-[var(--color-muted)]">Skipped</span> : h.answer}
-                  {h.outcome === 'correct' && h.item ? ` → ${h.item.entry.name}` : ''}
+                  {h.outcome === 'correct' && h.item ? ` → ${h.item.entry.name} (${h.item.entry.year})` : ''}
                 </p>
               </div>
               {h.item && h.outcome === 'correct' ? (
@@ -228,14 +228,17 @@ export function RarityMode() {
             <>
               <TierBadge tier={outcome.item.tier} size="lg" />
               <p className="text-lg font-bold">{outcome.item.answer}</p>
-              <p className="text-sm text-[var(--color-muted)]">from {outcome.item.entry.name}</p>
+              <p className="text-sm text-[var(--color-muted)]">
+                from {outcome.item.entry.name} <span className="text-[var(--color-brand-2)]">({outcome.item.entry.year})</span>
+              </p>
               <p className="font-retro text-2xl text-[var(--color-exact)]">+{outcome.item.points} pts</p>
             </>
           ) : outcome.kind === 'duplicate' ? (
             <>
               <p className="font-retro text-xs text-[var(--color-partial)]">ALREADY SCORED</p>
               <p className="text-sm text-[var(--color-muted)]">
-                {outcome.item?.answer} was already used for this prompt type &mdash; no extra points.
+                {outcome.item?.answer} ({outcome.item?.entry.year}) was already used for this prompt type &mdash; no
+                extra points.
               </p>
             </>
           ) : (
