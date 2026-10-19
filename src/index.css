@@ -1,0 +1,217 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-retro: 'Press Start 2P', monospace;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --color-ink: #0a0818;
+  --color-bg: #0d0b1e;
+  --color-surface: #16132e;
+  --color-surface-2: #201c42;
+  --color-border: #35306b;
+  --color-border-soft: #262153;
+  --color-muted: #8a84b8;
+  --color-text: #eceafc;
+
+  --color-brand: #ff3bd4;
+  --color-brand-2: #39e0ff;
+
+  --color-exact: #39ff6a;
+  --color-partial: #ffd23f;
+  --color-none: #4b4870;
+
+  --color-tier-common: #8fd3ff;
+  --color-tier-uncommon: #39e0ff;
+  --color-tier-rare: #c084fc;
+  --color-tier-ultra: #ffd23f;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain;
+}
+
+#root {
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+.font-retro {
+  font-family: var(--font-retro);
+}
+
+/* Scanline + vignette atmosphere, subtle so content stays readable */
+.crt-bg {
+  background-image:
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at top, #241f4d 0%, #0d0b1e 60%);
+  background-attachment: fixed;
+}
+
+.pixel-border {
+  position: relative;
+  border: 2px solid var(--color-border);
+  box-shadow:
+    0 0 0 2px var(--color-ink),
+    0 4px 0 0 var(--color-ink);
+  border-radius: 2px;
+}
+
+.pixel-corners {
+  clip-path: polygon(
+    0 8px, 8px 8px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%,
+    8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+}
+
+::selection {
+  background: var(--color-brand);
+  color: var(--color-ink);
+}
+
+/* Flash feedback: a short color pulse used on correct/wrong/tier reveals */
+@keyframes flash-pulse {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.flash-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  animation: flash-pulse 0.55s ease-out forwards;
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.animate-pop {
+  animation: pop-in 0.28s steps(6, end);
+}
+
+@keyframes tile-flip {
+  0% {
+    transform: rotateX(0deg);
+  }
+  50% {
+    transform: rotateX(90deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+.animate-tile-flip {
+  animation: tile-flip 0.45s ease-in-out;
+  transform-style: preserve-3d;
+}
+
+@keyframes shake-x {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+.animate-shake {
+  animation: shake-x 0.35s ease-in-out;
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: translateY(8px) scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.animate-bounce-in {
+  animation: bounce-in 0.3s ease-out;
+}
+
+@keyframes shimmer-gold {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+.tier-ultra-shimmer {
+  background: linear-gradient(90deg, #ffd23f, #ff8a00, #ff3bd4, #ffd23f);
+  background-size: 300% 100%;
+  animation: shimmer-gold 2.2s linear infinite;
+}
+
+@keyframes caret-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+.animate-caret {
+  animation: caret-blink 1s step-end infinite;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop,
+  .animate-tile-flip,
+  .animate-shake,
+  .animate-bounce-in,
+  .tier-ultra-shimmer,
+  .flash-overlay {
+    animation: none !important;
+  }
+}
