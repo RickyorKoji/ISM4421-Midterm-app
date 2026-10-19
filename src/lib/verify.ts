@@ -62,11 +62,21 @@ export interface WikiResult {
  * A network failure or no-match doesn't reject the submission outright; it
  * comes back unverified so a human can still review it.
  */
-export async function verifyExists(raw: string): Promise<WikiResult> {
+/**
+ * `externalSignal` lets a caller (e.g. a debounced live-typing check) cancel
+ * an in-flight lookup early when the input changes again, on top of this
+ * function's own timeout.
+ */
+export async function verifyExists(raw: string, externalSignal?: AbortSignal): Promise<WikiResult> {
   const query = raw.trim();
   const endpoint = `https://en.wikipedia.org/w/api.php?action=opensearch&format=json&origin=*&limit=1&search=${encodeURIComponent(query)}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', onExternalAbort);
+  }
   try {
     const res = await fetch(endpoint, { signal: controller.signal });
     if (!res.ok) {
@@ -85,5 +95,6 @@ export async function verifyExists(raw: string): Promise<WikiResult> {
     return { found: false, error: timedOut ? 'Lookup timed out.' : 'Could not reach the lookup service.' };
   } finally {
     clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', onExternalAbort);
   }
 }

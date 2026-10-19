@@ -5,6 +5,7 @@ import { checkDuplicate, validateFormat, verifyExists } from '../lib/verify';
 import { sfx } from '../lib/sound';
 
 const COOLDOWN_MS = 4000;
+const LIVE_LOOKUP_DEBOUNCE_MS = 600;
 
 const STATUS_STYLE: Record<SuggestionStatus, string> = {
   duplicate: 'border-[var(--color-partial)] text-[var(--color-partial)]',
@@ -20,6 +21,24 @@ const STATUS_LABEL: Record<SuggestionStatus, string> = {
   rejected: 'Rejected',
 };
 
+const STATUS_TEXT_COLOR: Record<SuggestionStatus, string> = {
+  duplicate: 'text-[var(--color-partial)]',
+  verified: 'text-[var(--color-exact)]',
+  unverified: 'text-[var(--color-brand-2)]',
+  rejected: 'text-[#ff3b57]',
+};
+
+interface LiveCheck {
+  kind: SuggestionStatus | 'checking';
+  /** The trimmed input text this check result applies to. */
+  forTerm: string;
+  note: string;
+  matchedEntryName?: string;
+  wikiTitle?: string;
+  wikiSnippet?: string;
+  wikiUrl?: string;
+}
+
 function timeAgo(ts: number): string {
   const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (diffSec < 60) return 'just now';
@@ -32,12 +51,15 @@ function timeAgo(ts: number): string {
 
 export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
   const [input, setInput] = useState('');
-  const [checking, setChecking] = useState(false);
+  const [liveCheck, setLiveCheck] = useState<LiveCheck | null>(null);
   const [lastResult, setLastResult] = useState<SuggestionRecord | null>(null);
   const [log, setLog] = useState<SuggestionRecord[]>(() => getSuggestionLog());
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const panelRef = useRef<HTMLDivElement>(null);
+
+  const debounceRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   const cooling = now < cooldownUntil;
 
@@ -55,66 +77,101 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  function record(partial: Omit<SuggestionRecord, 'id' | 'timestamp'>) {
-    const full = addSuggestionRecord(partial);
-    setLog((l) => [full, ...l].slice(0, 30));
-    setLastResult(full);
-  }
+  // Clean up any pending debounce/fetch if the modal closes mid-check.
+  useEffect(
+    () => () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    },
+    [],
+  );
 
-  async function handleSubmit() {
-    const term = input.trim();
-    if (!term || checking || cooling) return;
+  function runLiveCheck(value: string) {
+    requestIdRef.current += 1;
+    const myId = requestIdRef.current;
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
 
-    const format = validateFormat(term);
-    if (!format.ok) {
-      sfx.invalid();
-      record({ term, status: 'rejected', note: format.reason ?? 'Rejected.' });
-      setCooldownUntil(Date.now() + COOLDOWN_MS);
-      setInput('');
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      setLiveCheck(null);
       return;
     }
 
-    const dup = checkDuplicate(term);
+    const format = validateFormat(trimmed);
+    if (!format.ok) {
+      setLiveCheck({ kind: 'rejected', forTerm: trimmed, note: format.reason ?? 'Rejected.' });
+      return;
+    }
+
+    const dup = checkDuplicate(trimmed);
     if (dup.isDuplicate) {
-      sfx.partial();
-      record({
-        term,
-        status: 'duplicate',
+      setLiveCheck({
+        kind: 'duplicate',
+        forTerm: trimmed,
         note: `Already in the game as "${dup.matchedName}" — try guessing it!`,
         matchedEntryName: dup.matchedName,
       });
-      setCooldownUntil(Date.now() + COOLDOWN_MS);
-      setInput('');
       return;
     }
 
-    setChecking(true);
-    sfx.click();
-    const wiki = await verifyExists(term);
-    setChecking(false);
-
-    if (wiki.found) {
-      sfx.exact();
-      record({
-        term,
-        status: 'verified',
-        note: 'Confirmed as a real title — queued for review before it can be added to the game.',
-        wikiTitle: wiki.title,
-        wikiSnippet: wiki.snippet,
-        wikiUrl: wiki.url,
+    setLiveCheck({ kind: 'checking', forTerm: trimmed, note: 'Checking…' });
+    debounceRef.current = window.setTimeout(() => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      verifyExists(trimmed, controller.signal).then((wiki) => {
+        if (myId !== requestIdRef.current) return; // superseded by a newer keystroke
+        if (wiki.found) {
+          setLiveCheck({
+            kind: 'verified',
+            forTerm: trimmed,
+            note: 'Looks like a real title.',
+            wikiTitle: wiki.title,
+            wikiSnippet: wiki.snippet,
+            wikiUrl: wiki.url,
+          });
+        } else {
+          setLiveCheck({
+            kind: 'unverified',
+            forTerm: trimmed,
+            note: wiki.error ?? "Couldn't confirm this automatically yet.",
+          });
+        }
       });
-    } else {
-      sfx.partial();
-      record({
-        term,
-        status: 'unverified',
-        note: wiki.error ?? "Couldn't confirm this automatically — flagged for manual review instead of being rejected outright.",
-      });
-    }
-    setCooldownUntil(Date.now() + COOLDOWN_MS);
-    setInput('');
+    }, LIVE_LOOKUP_DEBOUNCE_MS);
   }
 
+  function handleInputChange(value: string) {
+    setInput(value);
+    runLiveCheck(value);
+  }
+
+  function commit() {
+    const term = input.trim();
+    if (!term || cooling || !liveCheck || liveCheck.kind === 'checking' || liveCheck.forTerm !== term) return;
+
+    sfx[liveCheck.kind === 'verified' ? 'exact' : liveCheck.kind === 'rejected' ? 'invalid' : 'partial']();
+    const full = addSuggestionRecord({
+      term,
+      status: liveCheck.kind,
+      note:
+        liveCheck.kind === 'verified'
+          ? 'Confirmed as a real title — queued for review before it can be added to the game.'
+          : liveCheck.note,
+      matchedEntryName: liveCheck.matchedEntryName,
+      wikiTitle: liveCheck.wikiTitle,
+      wikiSnippet: liveCheck.wikiSnippet,
+      wikiUrl: liveCheck.wikiUrl,
+    });
+    setLog((l) => [full, ...l].slice(0, 30));
+    setLastResult(full);
+    setCooldownUntil(Date.now() + COOLDOWN_MS);
+    setInput('');
+    setLiveCheck(null);
+  }
+
+  const trimmedInput = input.trim();
+  const canCommit = Boolean(trimmedInput) && !cooling && liveCheck !== null && liveCheck.kind !== 'checking' && liveCheck.forTerm === trimmedInput;
   const cooldownSecondsLeft = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
 
   return (
@@ -124,7 +181,7 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div ref={panelRef} className="pixel-border scrollbar-thin max-h-[90vh] w-full max-w-lg overflow-y-auto bg-[var(--color-surface)] p-5">
+      <div className="pixel-border scrollbar-thin max-h-[90vh] w-full max-w-lg overflow-y-auto bg-[var(--color-surface)] p-5">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-retro text-xs text-[var(--color-brand)]">SUGGEST A TITLE</h2>
           <button
@@ -138,35 +195,39 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <p className="mb-4 text-xs text-[var(--color-muted)]">
-          Think we're missing a game or show? Type it below. We'll check it against what's already in the game, then
-          try to confirm it's a real title (via Wikipedia) before it goes into the review queue below — so the list
-          stays made of actual titles, not random text.
+          Think we're missing a game or show? Start typing below &mdash; we'll check it against what's already in the
+          game and try to confirm it's a real title (via Wikipedia) as you type. Press CHECK to log the result below,
+          so the list stays made of actual titles, not random text.
         </p>
 
-        <div className="mb-2 flex gap-2">
+        <div className="mb-1 flex gap-2">
           <input
             autoFocus
             value={input}
-            disabled={checking || cooling}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && commit()}
             placeholder="e.g. Hades II"
             autoComplete="off"
             spellCheck={false}
-            className="min-w-0 flex-1 rounded-sm border-2 border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand-2)] disabled:opacity-50"
+            className="min-w-0 flex-1 rounded-sm border-2 border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text)] outline-none focus:border-[var(--color-brand-2)]"
           />
           <button
             type="button"
-            onClick={handleSubmit}
-            disabled={!input.trim() || checking || cooling}
+            onClick={commit}
+            disabled={!canCommit}
             className="font-retro shrink-0 rounded-sm border-2 border-[var(--color-border)] bg-[var(--color-brand)] px-3 py-2 text-[10px] text-[var(--color-ink)] disabled:opacity-40"
           >
-            {checking ? '...' : cooling ? `${cooldownSecondsLeft}s` : 'CHECK'}
+            {cooling ? `${cooldownSecondsLeft}s` : 'CHECK'}
           </button>
         </div>
-        <p className="mb-4 text-[10px] text-[var(--color-muted)]">
-          {checking ? 'Checking the dataset, then looking it up…' : ' '}
-        </p>
+
+        <div className="mb-4 min-h-[18px]">
+          {liveCheck && (
+            <p className={`flex items-center gap-1.5 text-[11px] ${liveCheck.kind === 'checking' ? 'text-[var(--color-muted)]' : STATUS_TEXT_COLOR[liveCheck.kind]}`}>
+              {liveCheck.kind === 'checking' ? <span className="animate-caret">looking it up&hellip;</span> : <span>{liveCheck.note}</span>}
+            </p>
+          )}
+        </div>
 
         {lastResult && (
           <div className={`animate-bounce-in mb-4 rounded-sm border-2 bg-[var(--color-surface-2)] p-3 ${STATUS_STYLE[lastResult.status]}`}>
