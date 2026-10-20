@@ -13,7 +13,8 @@ import type { MediaEntry } from '../types';
 //
 // `popularity` (0-100) methodology: it estimates how broadly a title is
 // recognized by the general public — not how large or devoted its own
-// fanbase is — because that's what Rarity Challenge's tiers are supposed to
+// fanbase is — since that's what Franchise Guess's Popularity attribute
+// (one of the six a guess is compared against the secret on) is supposed to
 // measure. It deliberately does NOT come from any single platform's rating,
 // review score, or internal "popularity" ranking (not MyAnimeList's
 // popularity rank, not Metacritic critic scores, not Steam/IMDb user

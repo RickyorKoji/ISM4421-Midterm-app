@@ -45,28 +45,3 @@ export interface GuessResult {
   overallScore: number;
   attributes: AttributeResult[];
 }
-
-export type RarityTier = 'common' | 'uncommon' | 'rare' | 'ultra';
-
-export interface PromptCategory {
-  id: string;
-  prompt: string;
-  kind: GuessTermKind;
-  /** Filters which entries' items are eligible for this prompt. */
-  filter: (entry: MediaEntry) => boolean;
-}
-
-export interface RarityPool {
-  category: PromptCategory;
-  items: RarityItem[];
-}
-
-export interface RarityItem {
-  answer: string;
-  normalized: string;
-  entry: MediaEntry;
-  kind: GuessTermKind;
-  effectivePopularity: number;
-  tier: RarityTier;
-  points: number;
-}

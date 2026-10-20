@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'Pixel Guess — Game & Cartoon Guessing Game',
         short_name: 'Pixel Guess',
-        description: 'Guess the video game or cartoon from clues, and test your trivia rarity in a retro 8-bit arcade.',
+        description: 'Guess the exact video game or cartoon title, character, or setting in 8 tries, in a retro 8-bit arcade.',
         theme_color: '#0d0b1e',
         background_color: '#0d0b1e',
         display: 'standalone',

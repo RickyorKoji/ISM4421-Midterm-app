@@ -55,26 +55,6 @@ export function recordFranchiseResult(won: boolean, guessesUsed: number) {
   return stats;
 }
 
-export interface RarityStats {
-  highScore: number;
-  gamesPlayed: number;
-  bestTierStreak: number;
-}
-
-const DEFAULT_RARITY_STATS: RarityStats = { highScore: 0, gamesPlayed: 0, bestTierStreak: 0 };
-
-export function getRarityStats(): RarityStats {
-  return read('rarity-stats', DEFAULT_RARITY_STATS);
-}
-
-export function recordRarityResult(score: number) {
-  const stats = getRarityStats();
-  stats.gamesPlayed += 1;
-  stats.highScore = Math.max(stats.highScore, score);
-  write('rarity-stats', stats);
-  return stats;
-}
-
 export function getMuted(): boolean {
   return read('muted', false);
 }
