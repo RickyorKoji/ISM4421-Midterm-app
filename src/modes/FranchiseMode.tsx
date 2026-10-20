@@ -15,7 +15,7 @@ import { addSuggestionRecord } from '../lib/suggestions';
 import { checkDuplicate, classifyTitle, validateFormat } from '../lib/verify';
 import type { GuessResult, GuessTermKind, MediaEntry } from '../types';
 
-const MAX_TRIES = 8;
+const MAX_TRIES = 10;
 
 type GameMode = 'daily' | 'practice';
 type Status = 'playing' | 'won' | 'lost';

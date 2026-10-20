@@ -1,4 +1,4 @@
-import { eraBand, eraBandStart, platformLabel } from './classification';
+import { platformLabel } from './classification';
 import type { AttributeResult, GuessResult, GuessTerm, MatchLevel, MediaEntry } from '../types';
 
 interface Weighted {
@@ -30,12 +30,13 @@ export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[
   const secretPlatformLabel = platformLabel(secret);
   const platformLevel: MatchLevel = guessPlatformLabel === secretPlatformLabel ? 'exact' : 'none';
 
-  // Era compares 5-year bands rather than a raw year difference: same band
-  // is exact, one band over/under is partial, anything further is none.
-  const guessBandStart = eraBandStart(guess.year);
-  const secretBandStart = eraBandStart(secret.year);
-  const bandGap = (secretBandStart - guessBandStart) / 5;
-  const eraLevel: MatchLevel = bandGap === 0 ? 'exact' : Math.abs(bandGap) === 1 ? 'partial' : 'none';
+  // Era compares actual release/start years directly: same year is exact,
+  // within 5 years either direction is partial, anything further is none.
+  // Always uses the START year (entry.year) even for cartoons/anime with a
+  // multi-year run — endYear only affects the win/loss reveal's display,
+  // never this comparison, to keep the signal unambiguous.
+  const yearGap = Math.abs(secret.year - guess.year);
+  const eraLevel: MatchLevel = yearGap === 0 ? 'exact' : yearGap <= 5 ? 'partial' : 'none';
 
   return [
     {
@@ -75,8 +76,11 @@ export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[
       label: 'Era',
       weight: 15,
       level: eraLevel,
-      guessValue: eraBand(guess.year),
-      secretValue: bandGap === 0 ? eraBand(secret.year) : bandGap > 0 ? 'Newer band ↑' : 'Older band ↓',
+      // Always the GUESS's own actual year — already known to the player, so
+      // showing it never leaks the secret's year, even on an exact match
+      // (where it's necessarily identical anyway) or a within-5-years partial.
+      guessValue: String(guess.year),
+      secretValue: String(guess.year),
     },
   ];
 }
