@@ -3,8 +3,9 @@ import { FlashOverlay } from '../components/FlashOverlay';
 import { AutocompleteInput } from '../components/AutocompleteInput';
 import { GuessRow } from '../components/GuessRow';
 import { entries } from '../data/entries';
-import { runTimeLabel } from '../lib/classification';
-import { makeGuessKey, resolveGuess, suggest } from '../lib/match';
+import { allGenres, runTimeLabel } from '../lib/classification';
+import { addCommunityEntry, buildCommunityEntry } from '../lib/community';
+import { getEntryById, makeGuessKey, refreshCommunityEntries, resolveGuess, suggest } from '../lib/match';
 import { createSeededRandom, pickRandomIndex, todaySeedKey } from '../lib/random';
 import { recordFranchiseResult, getFranchiseStats } from '../lib/storage';
 import { buildGuessResult } from '../lib/similarity';
@@ -21,6 +22,14 @@ type Status = 'playing' | 'won' | 'lost';
 const TARGET_KINDS: GuessTermKind[] = ['title', 'character', 'setting'];
 const KIND_LABEL: Record<GuessTermKind, string> = { title: 'TITLE', character: 'CHARACTER', setting: 'SETTING' };
 const KIND_NOUN: Record<GuessTermKind, string> = { title: 'Title', character: 'Character', setting: 'Setting' };
+const ALL_GENRES = allGenres();
+
+type GenreKnowledge = 'confirmed' | 'eliminated' | 'unknown';
+const GENRE_CHIP_STYLES: Record<GenreKnowledge, string> = {
+  confirmed: 'border-[var(--color-exact)] bg-[var(--color-exact)]/15 text-[var(--color-exact)]',
+  eliminated: 'border-[var(--color-border)] text-[var(--color-muted)] opacity-50 line-through',
+  unknown: 'border-[var(--color-border)] text-[var(--color-text)]',
+};
 
 interface GuessTarget {
   kind: GuessTermKind;
@@ -40,15 +49,19 @@ function buildTarget(entry: MediaEntry, kind: GuessTermKind, draw: () => number)
   return { kind, entry, label: pool[idx] };
 }
 
-function pickTarget(mode: GameMode, excludeEntryId?: string): GuessTarget {
+const PRACTICE_HISTORY_SIZE = 5;
+
+function pickTarget(mode: GameMode, excludeEntryIds?: string[]): GuessTarget {
   if (mode === 'daily') {
     const draw = createSeededRandom(todaySeedKey());
     const entryIndex = Math.floor(draw() * entries.length);
     const kind = TARGET_KINDS[Math.floor(draw() * TARGET_KINDS.length)];
     return buildTarget(entries[entryIndex], kind, draw);
   }
-  const excludeIndex = excludeEntryId ? entries.findIndex((e) => e.id === excludeEntryId) : undefined;
-  const entryIndex = pickRandomIndex(entries.length, excludeIndex);
+  const excludeIndices = new Set(
+    (excludeEntryIds ?? []).map((id) => entries.findIndex((e) => e.id === id)).filter((i) => i !== -1),
+  );
+  const entryIndex = pickRandomIndex(entries.length, excludeIndices);
   const kind = TARGET_KINDS[Math.floor(Math.random() * TARGET_KINDS.length)];
   return buildTarget(entries[entryIndex], kind, Math.random);
 }
@@ -65,9 +78,11 @@ export function FranchiseMode() {
   const [flash, setFlash] = useState<{ id: number; color: string | null }>({ id: 0, color: null });
   const [stats, setStats] = useState(getFranchiseStats());
   const [checkingGuess, setCheckingGuess] = useState(false);
+  const [showGenreBank, setShowGenreBank] = useState(true);
 
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const recentTargetIdsRef = useRef<string[]>([]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -77,6 +92,21 @@ export function FranchiseMode() {
     [guesses],
   );
   const triesLeft = MAX_TRIES - guesses.length;
+
+  // Which genres this round's guesses have confirmed are (or aren't) in the secret —
+  // a true miss on a guess's Genre attribute means NONE of that guess's genres are
+  // shared, so every genre it lists can be safely marked eliminated, Wordle-keyboard-style.
+  const genreKnowledge = useMemo(() => {
+    const confirmed = new Set<string>();
+    const eliminated = new Set<string>();
+    for (const g of guesses) {
+      for (const genre of g.entry.genres) {
+        if (target.entry.genres.includes(genre)) confirmed.add(genre);
+        else eliminated.add(genre);
+      }
+    }
+    return { confirmed, eliminated };
+  }, [guesses, target]);
 
   function triggerFlash(color: string) {
     setFlash((f) => ({ id: f.id + 1, color }));
@@ -92,7 +122,11 @@ export function FranchiseMode() {
     abortRef.current?.abort();
     setCheckingGuess(false);
     setMode(nextMode);
-    setTarget(pickTarget(nextMode, nextMode === 'practice' ? target.entry.id : undefined));
+    const nextTarget = pickTarget(nextMode, nextMode === 'practice' ? recentTargetIdsRef.current : undefined);
+    if (nextMode === 'practice') {
+      recentTargetIdsRef.current = [...recentTargetIdsRef.current, nextTarget.entry.id].slice(-PRACTICE_HISTORY_SIZE);
+    }
+    setTarget(nextTarget);
     setGuesses([]);
     setStatus('playing');
     setMessage(null);
@@ -143,16 +177,19 @@ export function FranchiseMode() {
       addSuggestionRecord({
         term: trimmed,
         status: 'verified',
-        note: `Auto-logged from a Franchise Guess attempt — confirmed via ${sourceLabel}, but not yet in this game's dataset.`,
+        note: `Auto-logged from a Franchise Guess attempt — confirmed via ${sourceLabel} and added as a guessable title.`,
         wikiTitle: wiki.title,
         wikiSnippet: wiki.snippet,
         wikiUrl: wiki.url,
         wikiCategories: wiki.matchedCategories,
       });
+      const communityEntry = buildCommunityEntry(trimmed, wiki);
+      const added = addCommunityEntry(communityEntry);
+      if (added) refreshCommunityEntries();
       sfx.invalid();
       triggerShake();
       setMessage(
-        `"${trimmed}" looks real (confirmed via ${sourceLabel}) but isn't in this game's dataset yet — logged it under Suggest a Title. Didn't cost you a try!`,
+        `"${communityEntry.name}" looks real (confirmed via ${sourceLabel}) — it's now a guessable title! Its genre/publisher/platform aren't known yet, so it won't be a strong clue until someone fills those in. This attempt didn't cost you a try.`,
       );
     } else if (wiki.found) {
       sfx.invalid();
@@ -172,7 +209,7 @@ export function FranchiseMode() {
       void verifyUnresolvedGuess(raw);
       return;
     }
-    const entry = entries.find((e) => e.id === term.entryId)!;
+    const entry = getEntryById(term.entryId)!;
     const guessKey = makeGuessKey(entry.id, term.kind, term.term);
     if (guessedKeys.has(guessKey)) {
       sfx.invalid();
@@ -249,6 +286,33 @@ export function FranchiseMode() {
         <div className="font-retro ml-3 shrink-0 text-lg text-[var(--color-brand)]">
           {triesLeft}<span className="text-xs text-[var(--color-muted)]">/{MAX_TRIES}</span>
         </div>
+      </div>
+
+      <div className="pixel-border bg-[var(--color-surface)] p-3">
+        <button
+          type="button"
+          onClick={() => setShowGenreBank((v) => !v)}
+          className="font-retro flex w-full items-center justify-between text-[9px] text-[var(--color-muted)] sm:text-[10px]"
+        >
+          <span>GENRE BANK</span>
+          <span>{showGenreBank ? 'HIDE ▲' : 'SHOW ▼'}</span>
+        </button>
+        {showGenreBank && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {ALL_GENRES.map((genre) => {
+              const state: GenreKnowledge = genreKnowledge.confirmed.has(genre)
+                ? 'confirmed'
+                : genreKnowledge.eliminated.has(genre)
+                  ? 'eliminated'
+                  : 'unknown';
+              return (
+                <span key={genre} className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${GENRE_CHIP_STYLES[state]}`}>
+                  {genre}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {status === 'playing' && (

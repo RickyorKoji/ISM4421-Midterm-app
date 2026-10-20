@@ -55,15 +55,19 @@ export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[
       weight: 25,
       level: genreOverlap.level,
       guessValue: guess.genres.join(', '),
+      // On a miss, show the GUESS's own genres (not a blank) so a player can rule
+      // them out for the secret — a true 'none' means zero overlap, confirmed.
       secretValue:
-        genreOverlap.level === 'none' ? '???' : genreOverlap.shared.join(', ') + (genreOverlap.level === 'partial' ? ' (partial)' : ''),
+        genreOverlap.level === 'none'
+          ? guess.genres.join(', ')
+          : genreOverlap.shared.join(', ') + (genreOverlap.level === 'partial' ? ' (partial)' : ''),
     },
     {
       label: 'Publisher/Studio',
       weight: 10,
       level: guess.publisher === secret.publisher ? 'exact' : 'none',
       guessValue: guess.publisher,
-      secretValue: guess.publisher === secret.publisher ? secret.publisher : '???',
+      secretValue: guess.publisher === secret.publisher ? secret.publisher : guess.publisher,
     },
     {
       label: 'Platform',
@@ -72,7 +76,7 @@ export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[
       guessValue: guessPlatformLabel,
       secretValue:
         platformLevel === 'none'
-          ? '???'
+          ? guessPlatformLabel
           : platformIsCategorical
             ? secretPlatformLabel
             : platformOverlap.shared.join(', ') + (platformLevel === 'partial' ? ' (partial)' : ''),

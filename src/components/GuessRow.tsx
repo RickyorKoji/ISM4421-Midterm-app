@@ -55,7 +55,7 @@ export function GuessRow({ result, index, note }: { result: GuessResult; index: 
             title={`${attr.label}: ${attr.secretValue}`}
           >
             <span className="text-[9px] font-bold uppercase tracking-wide opacity-80">{attr.label}</span>
-            <span className="truncate text-xs font-semibold">{attr.level === 'none' ? '???' : attr.secretValue}</span>
+            <span className="truncate text-xs font-semibold">{attr.secretValue}</span>
           </div>
         ))}
       </div>

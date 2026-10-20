@@ -1,3 +1,4 @@
+import { entries } from '../data/entries';
 import type { MediaEntry } from '../types';
 
 /** Buckets a year into a 5-year span, e.g. 2011 -> "2010–2014". */
@@ -25,4 +26,11 @@ export function runTimeLabel(entry: MediaEntry): string {
 export function platformLabel(entry: MediaEntry): string {
   if (entry.type === 'game') return entry.primaryPlatform ?? entry.platforms[0] ?? 'Unknown';
   return entry.platforms.join(', ');
+}
+
+/** Every distinct genre used anywhere in the dataset, alphabetized — the full "alphabet" a player is working with. */
+export function allGenres(): string[] {
+  const set = new Set<string>();
+  for (const entry of entries) for (const genre of entry.genres) set.add(genre);
+  return [...set].sort((a, b) => a.localeCompare(b));
 }

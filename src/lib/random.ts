@@ -37,11 +37,12 @@ export function todaySeedKey(): string {
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-export function pickRandomIndex(length: number, exclude?: number): number {
+export function pickRandomIndex(length: number, excludeIndices?: Set<number>): number {
   if (length <= 1) return 0;
-  let idx = Math.floor(Math.random() * length);
-  if (exclude !== undefined) {
-    while (idx === exclude) idx = Math.floor(Math.random() * length);
+  if (!excludeIndices || excludeIndices.size === 0 || excludeIndices.size >= length) {
+    return Math.floor(Math.random() * length);
   }
+  let idx = Math.floor(Math.random() * length);
+  while (excludeIndices.has(idx)) idx = Math.floor(Math.random() * length);
   return idx;
 }

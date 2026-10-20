@@ -1,4 +1,5 @@
 import { entries } from '../data/entries';
+import { getCommunityEntries } from './community';
 import type { GuessTerm, GuessTermKind, MediaEntry } from '../types';
 
 export function normalize(value: string): string {
@@ -10,12 +11,11 @@ export function normalize(value: string): string {
     .trim();
 }
 
-/** Flat, searchable index of every title/character/setting across all entries. */
-export const guessIndex: GuessTerm[] = buildGuessIndex();
+let communityEntries: MediaEntry[] = getCommunityEntries();
 
 function buildGuessIndex(): GuessTerm[] {
   const terms: GuessTerm[] = [];
-  for (const entry of entries) {
+  for (const entry of [...entries, ...communityEntries]) {
     const titleVariants = [entry.name, ...entry.aliases];
     for (const t of titleVariants) {
       terms.push({ term: entry.name, normalized: normalize(t), kind: 'title', entryId: entry.id });
@@ -28,6 +28,20 @@ function buildGuessIndex(): GuessTerm[] {
     }
   }
   return terms;
+}
+
+/** Flat, searchable index of every title/character/setting across all entries (curated + community). */
+export let guessIndex: GuessTerm[] = buildGuessIndex();
+
+/** Re-reads community entries from storage and rebuilds the index — call right after addCommunityEntry(). */
+export function refreshCommunityEntries(): void {
+  communityEntries = getCommunityEntries();
+  guessIndex = buildGuessIndex();
+}
+
+/** Looks up an entry by id across both the curated dataset and community submissions. */
+export function getEntryById(id: string): MediaEntry | undefined {
+  return entries.find((e) => e.id === id) ?? communityEntries.find((e) => e.id === id);
 }
 
 /**
@@ -66,7 +80,8 @@ export function suggest(query: string, limit = 8, excludeKeys: Set<string> = new
   for (const t of guessIndex) {
     if (excludeKeys.has(makeGuessKey(t.entryId, t.kind, t.term))) continue;
     if (!t.normalized.includes(norm)) continue;
-    const entry = entries.find((e) => e.id === t.entryId) as MediaEntry;
+    const entry = getEntryById(t.entryId);
+    if (!entry) continue;
     const label = t.kind === 'title' ? entry.name : t.term;
     const key = `${t.kind}:${label}`;
     if (seen.has(key)) continue;

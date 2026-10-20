@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { addCommunityEntry, buildCommunityEntry } from '../lib/community';
+import { refreshCommunityEntries } from '../lib/match';
 import { addSuggestionRecord, getSuggestionLog } from '../lib/suggestions';
 import type { SuggestionRecord, SuggestionStatus } from '../lib/suggestions';
 import { checkDuplicate, classifyTitle, validateFormat } from '../lib/verify';
@@ -48,6 +50,8 @@ interface LiveCheck {
   wikiSnippet?: string;
   wikiUrl?: string;
   wikiCategories?: string[];
+  /** Only set on 'verified' — needed to build the community entry at commit time. */
+  wikiKind?: MediaKind;
 }
 
 function timeAgo(ts: number): string {
@@ -151,6 +155,7 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
             wikiSnippet: wiki.snippet,
             wikiUrl: wiki.url,
             wikiCategories: wiki.matchedCategories,
+            wikiKind: wiki.kind,
           });
         } else if (wiki.found) {
           setLiveCheck({
@@ -182,10 +187,24 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
     if (!term || cooling || !liveCheck || liveCheck.kind === 'checking' || liveCheck.forTerm !== term) return;
 
     sfx[liveCheck.kind === 'verified' ? 'exact' : liveCheck.kind === 'rejected' ? 'invalid' : 'partial']();
+
+    let note = liveCheck.note;
+    if (liveCheck.kind === 'verified' && liveCheck.wikiKind) {
+      const communityEntry = buildCommunityEntry(term, {
+        title: liveCheck.wikiTitle,
+        kind: liveCheck.wikiKind,
+        matchedCategories: liveCheck.wikiCategories,
+      });
+      if (addCommunityEntry(communityEntry)) {
+        refreshCommunityEntries();
+        note = `${note} Added as "${communityEntry.name}" — guessable by title in Franchise Guess now.`;
+      }
+    }
+
     const full = addSuggestionRecord({
       term,
       status: liveCheck.kind,
-      note: liveCheck.note,
+      note,
       matchedEntryName: liveCheck.matchedEntryName,
       wikiTitle: liveCheck.wikiTitle,
       wikiSnippet: liveCheck.wikiSnippet,

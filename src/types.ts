@@ -28,6 +28,12 @@ export interface MediaEntry {
   settings: string[];
   /** Alternate spellings/short names that should resolve to this entry. */
   aliases: string[];
+  /**
+   * Set on a title a player suggested and had confirmed via Wikipedia/Fandom,
+   * not yet hand-curated. It's guessable (by title) but excluded from puzzle
+   * target selection, since it has no real genre/publisher/platform/cast data.
+   */
+  isCommunitySubmission?: boolean;
 }
 
 export type GuessTermKind = 'title' | 'character' | 'setting';
