@@ -10,6 +10,18 @@ import type { MediaEntry } from '../types';
 // Vercetti". When a franchise swings that hard between entries, split it
 // into one MediaEntry per representative installment (see the `gta-*` and
 // `final-fantasy-*` entries below) instead of averaging it into one.
+//
+// `primaryPlatform` note: it reflects genuine platform history (where a
+// game/show actually originated or was exclusive to, even temporarily —
+// Stardew Valley/Hollow Knight really did launch PC-only; Overwatch and
+// Cyberpunk 2077 did not, they launched day-one on PC+PlayStation+Xbox
+// simultaneously), not a studio's general brand reputation. A developer
+// known for PC games doesn't make every one of their titles "PC" if that
+// specific title never had a single-platform window — that's exactly the
+// Call of Duty/Overwatch/Cyberpunk mistakes an earlier pass made and this
+// pass corrected. When in doubt, check whether the SPECIFIC installment
+// genuinely launched on one platform before others, not what the
+// publisher/franchise is generally associated with.
 export const entries: MediaEntry[] = [
   {
     id: 'devil-may-cry',
@@ -460,7 +472,7 @@ export const entries: MediaEntry[] = [
   // free-to-play battle royale — a genre change as sharp as Final Fantasy
   // XIV's, so it's split by era/sub-series instead of one 2003-dated entry.
   {
-    id: 'call-of-duty-wwii',
+    id: 'call-of-duty-1',
     name: 'Call of Duty',
     type: 'game',
     franchise: 'Call of Duty',
@@ -471,7 +483,7 @@ export const entries: MediaEntry[] = [
     year: 2003,
     protagonists: ['Private Martin', 'Sergeant Powell'],
     settings: ['Normandy', 'Stalingrad', 'Pointe du Hoc'],
-    aliases: ['cod 1', 'cod ww2'],
+    aliases: ['cod 1'],
   },
   {
     id: 'modern-warfare',
@@ -537,7 +549,7 @@ export const entries: MediaEntry[] = [
     publisher: 'Blizzard Entertainment',
     genres: ['FPS', 'Hero Shooter', 'Team-based'],
     platforms: ['PlayStation', 'Xbox', 'PC', 'Switch'],
-    primaryPlatform: 'PC',
+    primaryPlatform: 'Multiplatform',
     year: 2016,
     protagonists: ['Tracer', 'Reaper', 'Genji'],
     settings: ["King's Row", 'Hanamura', 'Watchpoint: Gibraltar'],
@@ -1263,7 +1275,7 @@ export const entries: MediaEntry[] = [
     publisher: 'CD Projekt Red',
     genres: ['RPG', 'Open World', 'Sci-Fi', 'FPS'],
     platforms: ['PC', 'PlayStation', 'Xbox'],
-    primaryPlatform: 'PC',
+    primaryPlatform: 'Multiplatform',
     year: 2020,
     protagonists: ['V', 'Johnny Silverhand', 'Judy Alvarez'],
     settings: ['Night City', 'Pacifica', 'Arasaka Tower'],
@@ -1730,18 +1742,18 @@ export const entries: MediaEntry[] = [
     aliases: ['r6', 'r6 siege'],
   },
   {
-    id: 'titanfall',
-    name: 'Titanfall',
+    id: 'titanfall-2',
+    name: 'Titanfall 2',
     type: 'game',
     franchise: 'Titanfall',
     publisher: 'Respawn Entertainment',
     genres: ['FPS', 'Sci-Fi', 'Shooter'],
     platforms: ['PC', 'PlayStation', 'Xbox'],
-    primaryPlatform: 'Xbox',
-    year: 2014,
+    primaryPlatform: 'Multiplatform',
+    year: 2016,
     protagonists: ['Jack Cooper', 'BT-7274', 'Viper'],
     settings: ['Angel City', 'Demeter', 'Typhon'],
-    aliases: [],
+    aliases: ['titanfall'],
   },
 
   // --- RTS / 4X / Tactics ---

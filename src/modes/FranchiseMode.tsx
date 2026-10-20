@@ -318,7 +318,7 @@ export function FranchiseMode() {
         title="PLATFORM BANK"
         groups={[
           { label: 'Games', items: PLATFORM_CATEGORIES.games },
-          { label: 'Cartoons', items: PLATFORM_CATEGORIES.cartoons },
+          { label: 'Cartoons & Anime', items: PLATFORM_CATEGORIES.cartoons },
         ]}
         confirmed={platformKnowledge.confirmed}
         eliminated={platformKnowledge.eliminated}
