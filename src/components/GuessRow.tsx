@@ -47,7 +47,7 @@ export function GuessRow({ result, index, note }: { result: GuessResult; index: 
           <span className="font-retro text-[10px] text-[var(--color-text)]">{result.overallScore}%</span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
         {result.attributes.map((attr) => (
           <div
             key={attr.label}

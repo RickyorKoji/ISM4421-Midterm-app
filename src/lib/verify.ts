@@ -83,6 +83,8 @@ export interface WikiClassification {
   /** A couple of the actual matched category names, for transparency. */
   matchedCategories?: string[];
   error?: string;
+  /** Which lookup actually confirmed this result. Absent when nothing confirmed it. */
+  source?: 'wikipedia' | 'fandom';
 }
 
 function stripDisambiguator(title: string): string {
@@ -156,24 +158,10 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]*>/g, '');
 }
 
-/**
- * `externalSignal` lets a caller (e.g. a debounced live-typing check) cancel
- * an in-flight lookup early when the input changes again, on top of this
- * function's own timeout.
- */
-export async function classifyTitle(raw: string, externalSignal?: AbortSignal): Promise<WikiClassification> {
-  const query = raw.trim();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  const onExternalAbort = () => controller.abort();
-  if (externalSignal) {
-    if (externalSignal.aborted) controller.abort();
-    else externalSignal.addEventListener('abort', onExternalAbort);
-  }
-
+async function classifyViaWikipedia(query: string, signal: AbortSignal): Promise<WikiClassification> {
   try {
     const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*&srlimit=6&srsearch=${encodeURIComponent(query)}`;
-    const searchData = (await fetchJson(searchUrl, controller.signal)) as {
+    const searchData = (await fetchJson(searchUrl, signal)) as {
       query?: { search?: { pageid: number; title: string; snippet: string }[] };
     };
     const hits: SearchHit[] = (searchData.query?.search ?? []).map((h) => ({
@@ -190,7 +178,7 @@ export async function classifyTitle(raw: string, externalSignal?: AbortSignal): 
     const best = exact ?? passing[0];
 
     const propsUrl = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&pageids=${best.pageid}&prop=categories|pageprops&cllimit=500&clshow=!hidden`;
-    const propsData = (await fetchJson(propsUrl, controller.signal)) as {
+    const propsData = (await fetchJson(propsUrl, signal)) as {
       query?: {
         pages?: Record<
           string,
@@ -240,6 +228,84 @@ export async function classifyTitle(raw: string, externalSignal?: AbortSignal): 
       kind: 'unknown',
       error: timedOut ? 'Lookup timed out.' : 'Could not reach the lookup service.',
     };
+  }
+}
+
+interface FandomHit {
+  title: string;
+  url?: string;
+  snippet?: string;
+}
+
+/**
+ * Fandom hosts one wiki per game/show (not one shared encyclopedia), so a
+ * title-similar hit on its cross-wiki search is already strong evidence the
+ * query names a real game or show — there's no separate category step like
+ * Wikipedia's, just the same title-similarity gate. Response shape isn't
+ * pinned to any official schema, so every field access is defensive; any
+ * unexpected shape just falls through to "no hit" rather than throwing.
+ */
+async function searchFandom(query: string, signal: AbortSignal): Promise<FandomHit | null> {
+  try {
+    const url = `https://www.fandom.com/api/v1/Search/List?query=${encodeURIComponent(query)}&limit=5&namespaces=0&minArticleQuality=0`;
+    const data = (await fetchJson(url, signal)) as Record<string, unknown>;
+    const rawItems = (Array.isArray(data.items) ? data.items : Array.isArray(data.results) ? data.results : []) as Record<
+      string,
+      unknown
+    >[];
+
+    for (const item of rawItems) {
+      const title = typeof item.title === 'string' ? item.title : typeof item.name === 'string' ? item.name : undefined;
+      if (!title || !titleMatchesQuery(query, title)) continue;
+      const hitUrl = typeof item.url === 'string' ? item.url : typeof item.wikiUrl === 'string' ? item.wikiUrl : undefined;
+      const rawSnippet =
+        typeof item.snippet === 'string' ? item.snippet : typeof item.snippetText === 'string' ? item.snippetText : '';
+      return { title, url: hitUrl, snippet: rawSnippet ? stripHtml(rawSnippet) : undefined };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `externalSignal` lets a caller (e.g. a debounced live-typing check) cancel
+ * an in-flight lookup early when the input changes again, on top of this
+ * function's own timeout.
+ *
+ * Checks Wikipedia first; if that doesn't confirm a game/show (not found,
+ * off-topic, or a disambiguation page), falls back to Fandom's cross-wiki
+ * search before giving the final verdict — some real titles have a
+ * dedicated Fandom wiki but no (or no clearly-categorized) Wikipedia page.
+ */
+export async function classifyTitle(raw: string, externalSignal?: AbortSignal): Promise<WikiClassification> {
+  const query = raw.trim();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', onExternalAbort);
+  }
+
+  try {
+    const wiki = await classifyViaWikipedia(query, controller.signal);
+    if (wiki.isGameOrShow) return { ...wiki, source: 'wikipedia' };
+
+    const fandomHit = await searchFandom(query, controller.signal);
+    if (fandomHit) {
+      return {
+        found: true,
+        isGameOrShow: true,
+        kind: 'unknown',
+        title: fandomHit.title,
+        snippet: fandomHit.snippet,
+        url: fandomHit.url,
+        source: 'fandom',
+      };
+    }
+
+    return { ...wiki, source: 'wikipedia' };
   } finally {
     clearTimeout(timeout);
     externalSignal?.removeEventListener('abort', onExternalAbort);

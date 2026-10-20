@@ -1,13 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlashOverlay } from '../components/FlashOverlay';
 import { AutocompleteInput } from '../components/AutocompleteInput';
 import { GuessRow } from '../components/GuessRow';
 import { entries } from '../data/entries';
+import { runTimeLabel } from '../lib/classification';
 import { makeGuessKey, resolveGuess, suggest } from '../lib/match';
 import { createSeededRandom, pickRandomIndex, todaySeedKey } from '../lib/random';
 import { recordFranchiseResult, getFranchiseStats } from '../lib/storage';
 import { buildGuessResult } from '../lib/similarity';
 import { sfx } from '../lib/sound';
+import { addSuggestionRecord } from '../lib/suggestions';
+import { checkDuplicate, classifyTitle, validateFormat } from '../lib/verify';
 import type { GuessResult, GuessTermKind, MediaEntry } from '../types';
 
 const MAX_TRIES = 8;
@@ -61,6 +64,12 @@ export function FranchiseMode() {
   const [shake, setShake] = useState(false);
   const [flash, setFlash] = useState<{ id: number; color: string | null }>({ id: 0, color: null });
   const [stats, setStats] = useState(getFranchiseStats());
+  const [checkingGuess, setCheckingGuess] = useState(false);
+
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const targetKey = makeGuessKey(target.entry.id, target.kind, target.label);
   const guessedKeys = useMemo(
@@ -79,6 +88,9 @@ export function FranchiseMode() {
   }
 
   function startNewGame(nextMode: GameMode) {
+    requestIdRef.current += 1;
+    abortRef.current?.abort();
+    setCheckingGuess(false);
     setMode(nextMode);
     setTarget(pickTarget(nextMode, nextMode === 'practice' ? target.entry.id : undefined));
     setGuesses([]);
@@ -87,13 +99,77 @@ export function FranchiseMode() {
     setInput('');
   }
 
-  function handleSubmit(raw: string) {
-    if (status !== 'playing') return;
-    const term = resolveGuess(raw);
-    if (!term) {
+  /**
+   * An unresolved guess isn't necessarily wrong — it might be a real title
+   * this dataset just doesn't have yet. Rather than reject it outright, run
+   * it through the same verification pipeline Suggest-a-Title uses (format
+   * check -> local duplicate/typo check -> Wikipedia/Fandom classification)
+   * so a confirmed-real title gets auto-logged there instead of just being
+   * told "not recognized", without costing the player a try.
+   */
+  async function verifyUnresolvedGuess(raw: string) {
+    const trimmed = raw.trim();
+
+    const format = validateFormat(trimmed);
+    if (!format.ok) {
+      sfx.invalid();
+      triggerShake();
+      setMessage(format.reason ?? `"${raw}" isn't a recognized title, character, or setting.`);
+      return;
+    }
+
+    const dup = checkDuplicate(trimmed);
+    if (dup.isDuplicate) {
+      sfx.invalid();
+      triggerShake();
+      setMessage(`Close! "${dup.matchedName}" is already in the game — check your spelling and try again.`);
+      return;
+    }
+
+    requestIdRef.current += 1;
+    const myId = requestIdRef.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setCheckingGuess(true);
+    setMessage(`Checking "${trimmed}" against Wikipedia/Fandom…`);
+    const wiki = await classifyTitle(trimmed, controller.signal);
+    if (myId !== requestIdRef.current) return; // superseded by a newer guess/round
+    setCheckingGuess(false);
+
+    if (wiki.isGameOrShow) {
+      const sourceLabel = wiki.source === 'fandom' ? 'a Fandom wiki' : 'Wikipedia';
+      addSuggestionRecord({
+        term: trimmed,
+        status: 'verified',
+        note: `Auto-logged from a Franchise Guess attempt — confirmed via ${sourceLabel}, but not yet in this game's dataset.`,
+        wikiTitle: wiki.title,
+        wikiSnippet: wiki.snippet,
+        wikiUrl: wiki.url,
+        wikiCategories: wiki.matchedCategories,
+      });
+      sfx.invalid();
+      triggerShake();
+      setMessage(
+        `"${trimmed}" looks real (confirmed via ${sourceLabel}) but isn't in this game's dataset yet — logged it under Suggest a Title. Didn't cost you a try!`,
+      );
+    } else if (wiki.found) {
+      sfx.invalid();
+      triggerShake();
+      setMessage(`Found "${wiki.title}" on Wikipedia, but it isn't a video game or animated/TV show. Try something else.`);
+    } else {
       sfx.invalid();
       triggerShake();
       setMessage(`"${raw}" isn't a recognized title, character, or setting. Try the suggestions list.`);
+    }
+  }
+
+  function handleSubmit(raw: string) {
+    if (status !== 'playing' || checkingGuess) return;
+    const term = resolveGuess(raw);
+    if (!term) {
+      void verifyUnresolvedGuess(raw);
       return;
     }
     const entry = entries.find((e) => e.id === term.entryId)!;
@@ -181,7 +257,8 @@ export function FranchiseMode() {
           onChange={setInput}
           onSubmit={handleSubmit}
           getSuggestions={(q) => suggest(q, 8, guessedKeys)}
-          placeholder="Type a title, character, or setting..."
+          placeholder={checkingGuess ? 'Checking…' : 'Type a title, character, or setting...'}
+          disabled={checkingGuess}
           shake={shake}
         />
       )}
@@ -199,7 +276,7 @@ export function FranchiseMode() {
             <p className="text-sm text-[var(--color-muted)]">{KIND_NOUN[target.kind]} from {target.entry.name}</p>
           )}
           <p className="text-sm text-[var(--color-muted)]">
-            {target.entry.genres.join(', ')} · {target.entry.year}
+            {target.entry.genres.join(', ')} · {runTimeLabel(target.entry)}
           </p>
           <button
             type="button"

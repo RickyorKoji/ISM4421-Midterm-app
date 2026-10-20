@@ -134,12 +134,19 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
         if (myId !== requestIdRef.current) return; // superseded by a newer keystroke
 
         if (wiki.isGameOrShow) {
-          const kindWord = KIND_WORD[wiki.kind];
-          const categoryHint = wiki.matchedCategories && wiki.matchedCategories.length > 0 ? ` (Wikipedia category: "${wiki.matchedCategories[0]}")` : '';
+          let note: string;
+          if (wiki.source === 'fandom') {
+            note = `Found a dedicated Fandom wiki for "${wiki.title}" — that's strong evidence it's a real game or show.`;
+          } else {
+            const kindWord = KIND_WORD[wiki.kind];
+            const categoryHint =
+              wiki.matchedCategories && wiki.matchedCategories.length > 0 ? ` (Wikipedia category: "${wiki.matchedCategories[0]}")` : '';
+            note = `Confirmed as a real ${kindWord} on Wikipedia${categoryHint}.`;
+          }
           setLiveCheck({
             kind: 'verified',
             forTerm: trimmed,
-            note: `Confirmed as a real ${kindWord} on Wikipedia${categoryHint}.`,
+            note,
             wikiTitle: wiki.title,
             wikiSnippet: wiki.snippet,
             wikiUrl: wiki.url,
@@ -219,8 +226,9 @@ export function SuggestTitleModal({ onClose }: { onClose: () => void }) {
         <p className="mb-4 text-xs text-[var(--color-muted)]">
           Think we're missing a game or show? Start typing below &mdash; we'll check it against what's already in the
           game, then search Wikipedia and look at that article's own categories to confirm it's actually tagged as a{' '}
-          <b>video game</b> or an <b>animated/TV series</b> (not just that some page with similar words exists).
-          Press CHECK to log the result below.
+          <b>video game</b> or an <b>animated/TV series</b> (not just that some page with similar words exists). If
+          Wikipedia comes up empty, we'll also check Fandom's wikis &mdash; each one is already dedicated to a
+          specific game or show. Press CHECK to log the result below.
         </p>
 
         <div className="mb-1 flex gap-2">

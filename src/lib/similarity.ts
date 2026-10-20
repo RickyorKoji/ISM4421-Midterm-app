@@ -1,3 +1,4 @@
+import { eraBand, eraBandStart, platformLabel } from './classification';
 import type { AttributeResult, GuessResult, GuessTerm, MatchLevel, MediaEntry } from '../types';
 
 interface Weighted {
@@ -16,18 +17,30 @@ function setOverlap(a: string[], b: string[]): { level: MatchLevel; shared: stri
   return { level: sameSet ? 'exact' : 'partial', shared };
 }
 
-function closeness(diff: number, exactMax: number, partialMax: number): MatchLevel {
-  const abs = Math.abs(diff);
-  if (abs <= exactMax) return 'exact';
-  if (abs <= partialMax) return 'partial';
-  return 'none';
-}
-
 export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[] {
   const genreOverlap = setOverlap(guess.genres, secret.genres);
+
+  // Games compare by defining platform identity (PC/PlayStation/Xbox/
+  // Nintendo/Arcade/Multiplatform) — a single, decisive category instead of
+  // a messy array almost every modern multiplatform game would share.
+  // Cartoons keep comparing their platforms array (broadcast networks) as
+  // an overlap, same as before.
+  const platformIsCategorical = guess.type === 'game' && secret.type === 'game';
   const platformOverlap = setOverlap(guess.platforms, secret.platforms);
-  const yearDiff = secret.year - guess.year;
-  const popDiff = secret.popularity - guess.popularity;
+  const guessPlatformLabel = platformLabel(guess);
+  const secretPlatformLabel = platformLabel(secret);
+  const platformLevel: MatchLevel = platformIsCategorical
+    ? guessPlatformLabel === secretPlatformLabel
+      ? 'exact'
+      : 'none'
+    : platformOverlap.level;
+
+  // Era compares 5-year bands rather than a raw year difference: same band
+  // is exact, one band over/under is partial, anything further is none.
+  const guessBandStart = eraBandStart(guess.year);
+  const secretBandStart = eraBandStart(secret.year);
+  const bandGap = (secretBandStart - guessBandStart) / 5;
+  const eraLevel: MatchLevel = bandGap === 0 ? 'exact' : Math.abs(bandGap) === 1 ? 'partial' : 'none';
 
   return [
     {
@@ -55,24 +68,21 @@ export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[
     {
       label: 'Platform',
       weight: 15,
-      level: platformOverlap.level,
-      guessValue: guess.platforms.join(', '),
+      level: platformLevel,
+      guessValue: guessPlatformLabel,
       secretValue:
-        platformOverlap.level === 'none' ? '???' : platformOverlap.shared.join(', ') + (platformOverlap.level === 'partial' ? ' (partial)' : ''),
+        platformLevel === 'none'
+          ? '???'
+          : platformIsCategorical
+            ? secretPlatformLabel
+            : platformOverlap.shared.join(', ') + (platformLevel === 'partial' ? ' (partial)' : ''),
     },
     {
       label: 'Era',
       weight: 15,
-      level: closeness(yearDiff, 2, 8),
-      guessValue: String(guess.year),
-      secretValue: yearDiff === 0 ? String(secret.year) : yearDiff > 0 ? 'Newer ↑' : 'Older ↓',
-    },
-    {
-      label: 'Popularity',
-      weight: 20,
-      level: closeness(popDiff, 8, 25),
-      guessValue: `${guess.popularity}/100`,
-      secretValue: popDiff === 0 ? `${secret.popularity}/100` : popDiff > 0 ? 'More popular ↑' : 'Less popular ↓',
+      level: eraLevel,
+      guessValue: eraBand(guess.year),
+      secretValue: bandGap === 0 ? eraBand(secret.year) : bandGap > 0 ? 'Newer band ↑' : 'Older band ↓',
     },
   ];
 }

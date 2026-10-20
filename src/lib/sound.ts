@@ -86,30 +86,5 @@ export const sfx = {
         { freq: 261.63, duration: 0.3, delay: 0.32, type: 'sawtooth' },
       ]),
     ),
-  tierCommon: () => guard(() => playNotes([{ freq: 392, duration: 0.1, type: 'square' }])),
-  tierUncommon: () =>
-    guard(() =>
-      playNotes([
-        { freq: 440, duration: 0.08, type: 'square' },
-        { freq: 554.37, duration: 0.14, delay: 0.08, type: 'square' },
-      ]),
-    ),
-  tierRare: () =>
-    guard(() =>
-      playNotes([
-        { freq: 523.25, duration: 0.08, type: 'square' },
-        { freq: 659.25, duration: 0.08, delay: 0.08, type: 'square' },
-        { freq: 880, duration: 0.18, delay: 0.16, type: 'square' },
-      ]),
-    ),
-  tierUltra: () =>
-    guard(() =>
-      playNotes([
-        { freq: 659.25, duration: 0.08, type: 'square' },
-        { freq: 783.99, duration: 0.08, delay: 0.08, type: 'square' },
-        { freq: 987.77, duration: 0.08, delay: 0.16, type: 'square' },
-        { freq: 1318.5, duration: 0.3, delay: 0.24, type: 'square' },
-      ]),
-    ),
   invalid: () => guard(() => playNotes([{ freq: 180, duration: 0.1, type: 'square', gain: 0.08 }])),
 };
