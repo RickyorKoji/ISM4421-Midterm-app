@@ -20,20 +20,15 @@ function setOverlap(a: string[], b: string[]): { level: MatchLevel; shared: stri
 export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[] {
   const genreOverlap = setOverlap(guess.genres, secret.genres);
 
-  // Games compare by defining platform identity (PC/PlayStation/Xbox/
-  // Nintendo/Arcade/Multiplatform) — a single, decisive category instead of
-  // a messy array almost every modern multiplatform game would share.
-  // Cartoons keep comparing their platforms array (broadcast networks) as
-  // an overlap, same as before.
-  const platformIsCategorical = guess.type === 'game' && secret.type === 'game';
-  const platformOverlap = setOverlap(guess.platforms, secret.platforms);
+  // Platform compares a single curated identity (PC/PlayStation/Xbox/
+  // Nintendo/Arcade/Multiplatform for games; Cartoon Network/Nickelodeon/
+  // Adult Swim/Toonami/Disney Channel/Fox/Comedy Central/Streaming for
+  // cartoons) rather than a raw platform/network array -- a decisive
+  // category instead of a messy list almost every modern game shares, or a
+  // one-off broadcaster (TV Tokyo, MBS...) a player has no intuition for.
   const guessPlatformLabel = platformLabel(guess);
   const secretPlatformLabel = platformLabel(secret);
-  const platformLevel: MatchLevel = platformIsCategorical
-    ? guessPlatformLabel === secretPlatformLabel
-      ? 'exact'
-      : 'none'
-    : platformOverlap.level;
+  const platformLevel: MatchLevel = guessPlatformLabel === secretPlatformLabel ? 'exact' : 'none';
 
   // Era compares 5-year bands rather than a raw year difference: same band
   // is exact, one band over/under is partial, anything further is none.
@@ -74,12 +69,7 @@ export function compareEntries(guess: MediaEntry, secret: MediaEntry): Weighted[
       weight: 15,
       level: platformLevel,
       guessValue: guessPlatformLabel,
-      secretValue:
-        platformLevel === 'none'
-          ? guessPlatformLabel
-          : platformIsCategorical
-            ? secretPlatformLabel
-            : platformOverlap.shared.join(', ') + (platformLevel === 'partial' ? ' (partial)' : ''),
+      secretValue: platformLevel === 'none' ? guessPlatformLabel : secretPlatformLabel,
     },
     {
       label: 'Era',

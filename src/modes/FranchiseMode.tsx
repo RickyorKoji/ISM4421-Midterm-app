@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AttributeBank } from '../components/AttributeBank';
 import { FlashOverlay } from '../components/FlashOverlay';
 import { AutocompleteInput } from '../components/AutocompleteInput';
 import { GuessRow } from '../components/GuessRow';
 import { entries } from '../data/entries';
-import { allGenres, runTimeLabel } from '../lib/classification';
+import { allGenres, allPlatformCategories, allPublishers, platformLabel, runTimeLabel } from '../lib/classification';
 import { addCommunityEntry, buildCommunityEntry } from '../lib/community';
 import { getEntryById, makeGuessKey, refreshCommunityEntries, resolveGuess, suggest } from '../lib/match';
 import { createSeededRandom, pickRandomIndex, todaySeedKey } from '../lib/random';
@@ -23,13 +24,8 @@ const TARGET_KINDS: GuessTermKind[] = ['title', 'character', 'setting'];
 const KIND_LABEL: Record<GuessTermKind, string> = { title: 'TITLE', character: 'CHARACTER', setting: 'SETTING' };
 const KIND_NOUN: Record<GuessTermKind, string> = { title: 'Title', character: 'Character', setting: 'Setting' };
 const ALL_GENRES = allGenres();
-
-type GenreKnowledge = 'confirmed' | 'eliminated' | 'unknown';
-const GENRE_CHIP_STYLES: Record<GenreKnowledge, string> = {
-  confirmed: 'border-[var(--color-exact)] bg-[var(--color-exact)]/15 text-[var(--color-exact)]',
-  eliminated: 'border-[var(--color-border)] text-[var(--color-muted)] opacity-50 line-through',
-  unknown: 'border-[var(--color-border)] text-[var(--color-text)]',
-};
+const ALL_PUBLISHERS = allPublishers();
+const PLATFORM_CATEGORIES = allPlatformCategories();
 
 interface GuessTarget {
   kind: GuessTermKind;
@@ -78,7 +74,6 @@ export function FranchiseMode() {
   const [flash, setFlash] = useState<{ id: number; color: string | null }>({ id: 0, color: null });
   const [stats, setStats] = useState(getFranchiseStats());
   const [checkingGuess, setCheckingGuess] = useState(false);
-  const [showGenreBank, setShowGenreBank] = useState(true);
 
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -104,6 +99,30 @@ export function FranchiseMode() {
         if (target.entry.genres.includes(genre)) confirmed.add(genre);
         else eliminated.add(genre);
       }
+    }
+    return { confirmed, eliminated };
+  }, [guesses, target]);
+
+  // Platform and Publisher/Studio are single-valued now, so each guess directly
+  // confirms or eliminates exactly one category/studio for the secret.
+  const platformKnowledge = useMemo(() => {
+    const confirmed = new Set<string>();
+    const eliminated = new Set<string>();
+    const secretLabel = platformLabel(target.entry);
+    for (const g of guesses) {
+      const label = platformLabel(g.entry);
+      if (label === secretLabel) confirmed.add(label);
+      else eliminated.add(label);
+    }
+    return { confirmed, eliminated };
+  }, [guesses, target]);
+
+  const publisherKnowledge = useMemo(() => {
+    const confirmed = new Set<string>();
+    const eliminated = new Set<string>();
+    for (const g of guesses) {
+      if (g.entry.publisher === target.entry.publisher) confirmed.add(g.entry.publisher);
+      else eliminated.add(g.entry.publisher);
     }
     return { confirmed, eliminated };
   }, [guesses, target]);
@@ -288,32 +307,28 @@ export function FranchiseMode() {
         </div>
       </div>
 
-      <div className="pixel-border bg-[var(--color-surface)] p-3">
-        <button
-          type="button"
-          onClick={() => setShowGenreBank((v) => !v)}
-          className="font-retro flex w-full items-center justify-between text-[9px] text-[var(--color-muted)] sm:text-[10px]"
-        >
-          <span>GENRE BANK</span>
-          <span>{showGenreBank ? 'HIDE ▲' : 'SHOW ▼'}</span>
-        </button>
-        {showGenreBank && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {ALL_GENRES.map((genre) => {
-              const state: GenreKnowledge = genreKnowledge.confirmed.has(genre)
-                ? 'confirmed'
-                : genreKnowledge.eliminated.has(genre)
-                  ? 'eliminated'
-                  : 'unknown';
-              return (
-                <span key={genre} className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${GENRE_CHIP_STYLES[state]}`}>
-                  {genre}
-                </span>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <AttributeBank
+        title="GENRE BANK"
+        items={ALL_GENRES}
+        confirmed={genreKnowledge.confirmed}
+        eliminated={genreKnowledge.eliminated}
+        defaultOpen
+      />
+      <AttributeBank
+        title="PLATFORM BANK"
+        groups={[
+          { label: 'Games', items: PLATFORM_CATEGORIES.games },
+          { label: 'Cartoons', items: PLATFORM_CATEGORIES.cartoons },
+        ]}
+        confirmed={platformKnowledge.confirmed}
+        eliminated={platformKnowledge.eliminated}
+      />
+      <AttributeBank
+        title="PUBLISHER/STUDIO BANK"
+        items={ALL_PUBLISHERS}
+        confirmed={publisherKnowledge.confirmed}
+        eliminated={publisherKnowledge.eliminated}
+      />
 
       {status === 'playing' && (
         <AutocompleteInput

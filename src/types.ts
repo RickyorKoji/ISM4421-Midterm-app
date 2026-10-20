@@ -4,10 +4,27 @@ export type MediaType = 'game' | 'cartoon';
  * A game's defining platform identity (which ecosystem it's really "of"),
  * not just every system it's ever shipped on — almost every modern game
  * ships on 3+ platforms, which made a raw platforms-array comparison
- * rarely distinguish anything. Games only; cartoons keep comparing their
- * `platforms` array (broadcast network/streaming service names) as-is.
+ * rarely distinguish anything.
  */
 export type GamePlatformCategory = 'PC' | 'PlayStation' | 'Xbox' | 'Nintendo' | 'Arcade' | 'Multiplatform';
+
+/**
+ * A cartoon/anime's defining distribution identity, same idea as
+ * GamePlatformCategory — a show's real broadcast network is often a
+ * one-off a player can't recognize (TV Tokyo, MBS, Discovery Family...),
+ * which made the old raw-network comparison rarely distinguish anything
+ * either. Entries without a clean fit (no recognizable English-language
+ * home) simply omit `primaryPlatform` and fall back to their real network.
+ */
+export type CartoonPlatformCategory =
+  | 'Cartoon Network'
+  | 'Nickelodeon'
+  | 'Adult Swim'
+  | 'Toonami'
+  | 'Disney Channel'
+  | 'Fox'
+  | 'Comedy Central'
+  | 'Streaming';
 
 export interface MediaEntry {
   id: string;
@@ -17,8 +34,8 @@ export interface MediaEntry {
   publisher: string;
   genres: string[];
   platforms: string[];
-  /** Games only — see GamePlatformCategory. Absent on cartoon entries. */
-  primaryPlatform?: GamePlatformCategory;
+  /** See GamePlatformCategory / CartoonPlatformCategory. Omitted when neither cleanly fits. */
+  primaryPlatform?: GamePlatformCategory | CartoonPlatformCategory;
   year: number;
   /** For cartoons/anime still airing as of this dataset, omit this. */
   endYear?: number;
