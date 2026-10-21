@@ -39,10 +39,24 @@ function itemPool(entry: MediaEntry, kind: GuessTermKind): string[] {
   return kind === 'character' ? entry.protagonists : entry.settings;
 }
 
+/** Items whose name actually resolves back to this entry (not shadowed by an earlier entry sharing the same name). */
+function selfResolvingPool(entry: MediaEntry, kind: GuessTermKind): string[] {
+  return itemPool(entry, kind).filter((label) => resolveGuess(label)?.entryId === entry.id);
+}
+
 function buildTarget(entry: MediaEntry, kind: GuessTermKind, draw: () => number): GuessTarget {
-  const pool = itemPool(entry, kind);
-  const idx = pool.length > 1 ? Math.floor(draw() * pool.length) : 0;
-  return { kind, entry, label: pool[idx] };
+  // A name shared with another entry always resolves to whichever entry comes first in the
+  // dataset (resolveGuess returns the first index match), so picking a shadowed name as the
+  // secret would be permanently unwinnable. Try the requested kind first, then fall back to
+  // the other kinds on this same entry so a single colliding name never breaks the round.
+  for (const k of [kind, ...TARGET_KINDS.filter((other) => other !== kind)]) {
+    const pool = selfResolvingPool(entry, k);
+    if (pool.length === 0) continue;
+    const idx = pool.length > 1 ? Math.floor(draw() * pool.length) : 0;
+    return { kind: k, entry, label: pool[idx] };
+  }
+  // Pathological: every term on this entry is shadowed. Fall back to its own title anyway.
+  return { kind: 'title', entry, label: entry.name };
 }
 
 const PRACTICE_HISTORY_SIZE = 5;
