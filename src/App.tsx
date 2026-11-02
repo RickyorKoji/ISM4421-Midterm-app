@@ -3,13 +3,16 @@ import { FranchiseMode } from './modes/FranchiseMode';
 import { SuggestTitleModal } from './components/SuggestTitleModal';
 import { LoginScreen } from './components/LoginScreen';
 import { UserBadge } from './components/UserBadge';
+import { ProfileModal } from './components/ProfileModal';
 import { ConfigErrorScreen } from './components/ConfigErrorScreen';
 import { getMuted, setMutedPref } from './lib/storage';
 import { setMuted } from './lib/sound';
 import { useAuth } from './lib/useAuth';
+import { useProfile } from './lib/useProfile';
 
 function App() {
   const { user, loading, signInWithGoogle, signOut, configured } = useAuth();
+  const { profile, save: saveProfile } = useProfile(user);
   const [muted, setMutedState] = useState(() => {
     const m = getMuted();
     setMuted(m);
@@ -17,6 +20,7 @@ function App() {
   });
   const [showHelp, setShowHelp] = useState(false);
   const [showSuggest, setShowSuggest] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   function toggleMute() {
     const next = !muted;
@@ -46,7 +50,7 @@ function App() {
               <span aria-hidden="true">🕹️</span> PIXEL GUESS
             </h1>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <UserBadge user={user} onSignOut={signOut} />
+              <UserBadge user={user} profile={profile} onSignOut={signOut} onEditProfile={() => setShowProfile(true)} />
               <button
                 type="button"
                 onClick={() => setShowSuggest(true)}
@@ -100,6 +104,9 @@ function App() {
       </footer>
 
       {showSuggest && <SuggestTitleModal onClose={() => setShowSuggest(false)} />}
+      {showProfile && (
+        <ProfileModal user={user} profile={profile} onSave={saveProfile} onClose={() => setShowProfile(false)} />
+      )}
     </div>
   );
 }
