@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
+    if (!supabase) return;
+
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
       setLoading(false);
@@ -21,6 +23,7 @@ export function useAuth() {
   }, []);
 
   function signInWithGoogle() {
+    if (!supabase) return;
     return supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
@@ -28,8 +31,9 @@ export function useAuth() {
   }
 
   function signOut() {
+    if (!supabase) return;
     return supabase.auth.signOut();
   }
 
-  return { user, loading, signInWithGoogle, signOut };
+  return { user, loading, signInWithGoogle, signOut, configured: isSupabaseConfigured };
 }

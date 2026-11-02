@@ -3,12 +3,13 @@ import { FranchiseMode } from './modes/FranchiseMode';
 import { SuggestTitleModal } from './components/SuggestTitleModal';
 import { LoginScreen } from './components/LoginScreen';
 import { UserBadge } from './components/UserBadge';
+import { ConfigErrorScreen } from './components/ConfigErrorScreen';
 import { getMuted, setMutedPref } from './lib/storage';
 import { setMuted } from './lib/sound';
 import { useAuth } from './lib/useAuth';
 
 function App() {
-  const { user, loading, signInWithGoogle, signOut } = useAuth();
+  const { user, loading, signInWithGoogle, signOut, configured } = useAuth();
   const [muted, setMutedState] = useState(() => {
     const m = getMuted();
     setMuted(m);
@@ -22,6 +23,10 @@ function App() {
     setMutedState(next);
     setMuted(next);
     setMutedPref(next);
+  }
+
+  if (!configured) {
+    return <ConfigErrorScreen />;
   }
 
   if (loading) {
