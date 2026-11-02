@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { FranchiseMode } from './modes/FranchiseMode';
 import { SuggestTitleModal } from './components/SuggestTitleModal';
+import { LoginScreen } from './components/LoginScreen';
+import { UserBadge } from './components/UserBadge';
 import { getMuted, setMutedPref } from './lib/storage';
 import { setMuted } from './lib/sound';
+import { useAuth } from './lib/useAuth';
 
 function App() {
+  const { user, loading, signInWithGoogle, signOut } = useAuth();
   const [muted, setMutedState] = useState(() => {
     const m = getMuted();
     setMuted(m);
@@ -20,6 +24,14 @@ function App() {
     setMutedPref(next);
   }
 
+  if (loading) {
+    return <div className="crt-bg min-h-[100dvh]" />;
+  }
+
+  if (!user) {
+    return <LoginScreen onSignInWithGoogle={signInWithGoogle} />;
+  }
+
   return (
     <div className="crt-bg min-h-[100dvh]">
       <header className="sticky top-0 z-30 border-b-2 border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur">
@@ -29,6 +41,7 @@ function App() {
               <span aria-hidden="true">🕹️</span> PIXEL GUESS
             </h1>
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <UserBadge user={user} onSignOut={signOut} />
               <button
                 type="button"
                 onClick={() => setShowSuggest(true)}
